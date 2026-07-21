@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>דשבורד הוצאות חודשי</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg-1:#f5f3ff; --bg-2:#eef2ff; --card:#ffffff;
+    --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --primary:#6366f1; --primary-2:#8b5cf6; --accent:#06b6d4;
+    --good:#10b981; --warn:#f59e0b; --bad:#ef4444;
+    --pill:#f3f4f6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:"Heebo","Segoe UI",-apple-system,sans-serif;color:var(--ink);background:linear-gradient(135deg,var(--bg-1),var(--bg-2));min-height:100vh}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 20px 80px}
+  h1{font-size:30px;margin:0 0 4px;font-weight:800;background:linear-gradient(135deg,var(--primary),var(--primary-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  h2{font-size:18px;margin:0 0 14px;font-weight:700}
+  h3{font-size:15px;margin:0 0 10px;font-weight:700;color:var(--ink)}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+
+  .drop{background:var(--card);border:2px dashed #c7d2fe;border-radius:18px;padding:22px 14px;text-align:center;cursor:pointer;transition:.15s;display:block}
+  .drop:hover,.drop.drag{border-color:var(--primary);background:#eef2ff}
+  .drop input{display:none}
+  .drop .big{font-size:16px;font-weight:700;margin-bottom:4px}
+  .drop .small{color:var(--muted);font-size:12px}
+
+  .grid{display:grid;gap:18px}
+  .grid.kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:22px}
+  .grid.two{grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin-top:22px}
+  .grid.three{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:22px}
+
+  .card{background:var(--card);border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.04);border:1px solid var(--line)}
+  .kpi{position:relative;overflow:hidden}
+  .kpi .label{color:var(--muted);font-size:13px;font-weight:500;margin-bottom:6px}
+  .kpi .value{font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .kpi .delta{font-size:12px;margin-top:4px;color:var(--muted)}
+  .kpi .delta.up{color:var(--bad)}
+  .kpi .delta.down{color:var(--good)}
+  .kpi .accent{position:absolute;left:-30px;top:-30px;width:80px;height:80px;border-radius:50%;opacity:.12}
+  .kpi.purple .accent{background:var(--primary)}
+  .kpi.cyan .accent{background:var(--accent)}
+  .kpi.green .accent{background:var(--good)}
+  .kpi.amber .accent{background:var(--warn)}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--line)}
+  th{font-weight:700;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;font-weight:600}
+  .pill{display:inline-block;background:var(--pill);border-radius:99px;padding:3px 10px;font-size:12px;color:var(--muted);font-weight:500}
+  .pill.good{background:#ecfdf5;color:#065f46}
+  .pill.warn{background:#fffbeb;color:#92400e}
+  .pill.bad{background:#fef2f2;color:#991b1b}
+  .pill.info{background:#eef2ff;color:#3730a3}
+
+  .bar{height:8px;background:#eef2ff;border-radius:99px;overflow:hidden;margin-top:6px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-2));border-radius:99px}
+
+  .insight{display:flex;gap:12px;padding:12px;border-radius:12px;background:#fff;border:1px solid var(--line);margin-bottom:10px}
+  .insight .ic{flex-shrink:0;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .insight.good .ic{background:#ecfdf5;color:#065f46}
+  .insight.warn .ic{background:#fffbeb;color:#92400e}
+  .insight.bad .ic{background:#fef2f2;color:#991b1b}
+  .insight.info .ic{background:#eef2ff;color:#3730a3}
+  .insight .body{flex:1;font-size:14px;line-height:1.55}
+  .insight .body b{font-weight:700}
+
+  select{font-family:inherit;font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:white;cursor:pointer}
+  button{font-family:inherit;font-size:14px;padding:10px 16px;border-radius:10px;border:0;cursor:pointer;background:var(--primary);color:white;font-weight:600}
+  button.ghost{background:white;color:var(--ink);border:1px solid var(--line)}
+  button.danger{background:var(--bad)}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+
+  .empty{text-align:center;padding:48px 16px;color:var(--muted)}
+  .scrollY{max-height:380px;overflow-y:auto}
+
+  .muted{color:var(--muted);font-size:13px}
+  .row-flex{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+  .tabBar{display:flex;gap:4px;background:#eef2ff;padding:5px;border-radius:14px;margin-top:22px;max-width:fit-content}
+  .tabBar button{background:transparent;color:var(--muted);font-size:14px;padding:9px 18px;border-radius:10px;font-weight:600;border:0;cursor:pointer}
+  .tabBar button.active{background:white;color:var(--ink);box-shadow:0 2px 6px rgba(15,23,42,.06)}
+  .tabPanel{display:none}
+  .tabPanel.active{display:block}
+
+  .monthChip{cursor:pointer;border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:99px;font-size:13px;font-weight:500;transition:.15s;display:flex;align-items:center;gap:6px}
+  .monthChip:hover{border-color:var(--primary);color:var(--primary)}
+  .monthChip.active{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:white;border-color:transparent;box-shadow:0 4px 12px rgba(99,102,241,.25)}
+  .monthChip .dot{width:6px;height:6px;border-radius:99px;background:#cbd5e1}
+  .monthChip.has-bank .dot{background:var(--good)}
+  .monthChip.active .dot{background:white}
+
+  @media (max-width:600px){
+    h1{font-size:24px}
+    .kpi .value{font-size:20px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px">
+    <div>
+      <h1>📊 דשבורד הוצאות חודשי</h1>
+      <div class="sub">גרור את האקסל מהאשראי ואופציונלית גם תנועות הבנק — לתמונה כלכלית מלאה לחודש.</div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="historyBtn">📅 היסטוריה</button>
+      <button class="ghost" id="settingsBtn">⚙️ הגדרות</button>
+    </div>
+  </header>
+
+  <label class="drop" id="dropZoneAll" style="padding:34px 18px">
+    <input type="file" id="fileInputAll" accept=".xlsx,.xls" multiple/>
+    <div class="big">📁 גרור לכאן את כל הקבצים — אשראי + בנק + כמה חודשים יחד</div>
+    <div class="small" id="uploadStatus">הדשבורד יזהה אוטומטית סוג כל קובץ ויחלק אותם לחודשים</div>
+  </label>
+
+  <div id="monthSelectorWrap" style="margin-top:18px;display:none">
+    <div class="card" style="padding:12px 16px">
+      <div class="row-flex" style="margin-bottom:8px"><h3 style="margin:0">📅 בחר חודש לצפייה</h3><span class="muted" id="monthCount"></span></div>
+      <div id="monthSelector" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="tabBar">
+      <button data-tab="cashflow" class="active">💰 תזרים</button>
+      <button data-tab="invest">📈 השקעות</button>
+      <button data-tab="breakdown">📊 פילוח</button>
+    </div>
+
+    <div id="tab-cashflow" class="tabPanel active">
+    <section class="grid kpis" id="cashflowKpis" style="display:none;margin-top:22px"></section>
+    <section class="grid kpis" id="kpis"></section>
+
+    <section class="grid two">
+      <div class="card">
+        <h2>פילוח לפי קטגוריה</h2>
+        <div style="position:relative;height:300px"><canvas id="catChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>טבלת קטגוריות</h2>
+        <div class="scrollY"><table id="catTable"><thead><tr><th>קטגוריה</th><th>סכום</th><th>%</th><th>עסקאות</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:22px">
+      <h2>💡 תובנות והמלצות</h2>
+      <div id="insights"></div>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <div class="row-flex"><h2>📌 תשלומים פעילים</h2><span class="muted" id="instSummary"></span></div>
+        <div class="scrollY"><table id="instTable"><thead><tr><th>בית עסק</th><th>קטגוריה</th><th>תשלום</th><th>נותרו</th><th>סה"כ עתיד</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="row-flex"><h2>🔁 הוראות קבע</h2><span class="muted" id="hokSummary"></span></div>
+        <div class="scrollY"><table id="hokTable"><thead><tr><th>בית עסק</th><th>קטגוריה</th><th>סכום</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <h2>🏪 בתי עסק מובילים</h2>
+        <div class="scrollY" id="topMerchants"></div>
+      </div>
+      <div class="card">
+        <h2>📈 השוואת חודשים</h2>
+        <div id="monthCompare"></div>
+      </div>
+    </section>
+
+    <section class="grid two" id="bankSection" style="display:none">
+      <div class="card">
+        <div class="row-flex"><h2>💰 הכנסות מהבנק</h2><span class="muted" id="incomeSummary"></span></div>
+        <div class="scrollY"><table id="incomeTable"><thead><tr><th>תאריך</th><th>תיאור</th><th class="num">סכום</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="row-flex"><h2>🏦 הוצאות ישירות מהבנק</h2><span class="muted" id="bankExpSummary"></span></div>
+        <div class="scrollY"><table id="bankExpTable"><thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th class="num">סכום</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:22px">
+      <div class="row-flex">
+        <h2>🧾 כל עסקאות האשראי (ניתן לשנות שיוך — נשמר לחודשים הבאים)</h2>
+        <input id="search" placeholder="חיפוש בית עסק..." style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);font-family:inherit;font-size:13px;width:220px"/>
+      </div>
+      <div class="scrollY" style="max-height:520px"><table id="txTable"><thead><tr><th>תאריך</th><th>בית עסק</th><th>קטגוריה</th><th class="num">סכום</th><th>סוג</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <div class="actions" style="margin-top:22px">
+      <button id="saveMonthBtn">💾 שמור את החודש להיסטוריה</button>
+      <button class="ghost" id="exportBtn">⬇️ ייצוא ניתוח כ-CSV</button>
+    </div>
+    </div><!-- /tab-cashflow -->
+
+    <div id="tab-invest" class="tabPanel">
+      <div id="investEmpty" class="card" style="margin-top:22px;padding:32px;text-align:center">
+        <div style="font-size:48px;margin-bottom:8px">📈</div>
+        <h2 style="margin-bottom:8px">לשונית השקעות</h2>
+        <p class="muted" style="max-width:560px;margin:0 auto 18px">עקוב אחר תיק הנכסים שלך: שווי כולל לאורך זמן, פירוט שינוי בכל רכיב, סך הפקדות ותשואה שנתית מצטברת. התחל בהוספת רכיבי התיק (תיק ני"ע, קופ"ג, פק"מ, נדל"ן וכו').</p>
+        <div class="actions" style="justify-content:center"><button id="investSetupBtn">➕ הוסף רכיב ראשון</button></div>
+      </div>
+
+      <div id="investMain" style="display:none">
+        <div class="actions" style="margin-top:22px;justify-content:flex-end">
+          <button class="ghost" id="manageComponentsBtn">⚙️ נהל רכיבים</button>
+          <button id="addInvestMonthBtn">➕ הוסף נתוני חודש</button>
+        </div>
+
+        <section class="grid kpis" id="investKpis" style="margin-top:14px"></section>
+
+        <section class="card" style="margin-top:18px">
+          <div class="row-flex"><h2>📊 שווי תיק לאורך זמן</h2><span class="muted" id="investChartNote"></span></div>
+          <div style="position:relative;height:340px"><canvas id="investChart"></canvas></div>
+        </section>
+
+        <section class="grid two" id="investComponentCards" style="margin-top:18px"></section>
+
+        <section class="card" style="margin-top:22px">
+          <div class="row-flex">
+            <h2>📋 פירוט חודשי (לחיצה על שורה — לעריכה)</h2>
+            <button class="ghost" id="exportInvestBtn">⬇️ ייצוא CSV</button>
+          </div>
+          <div class="scrollY" style="max-height:520px"><table id="investTable"><thead></thead><tbody></tbody></table></div>
+        </section>
+      </div>
+
+    </div><!-- /tab-invest -->
+
+    <div id="tab-breakdown" class="tabPanel">
+      <div id="breakdownContent" style="margin-top:22px">
+        <div class="empty">טען חודש כדי לראות פילוח</div>
+      </div>
+    </div>
+
+    <div id="componentsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
+      <div class="card" style="max-width:560px;width:100%;max-height:80vh;overflow:auto">
+        <div class="row-flex"><h2>⚙️ ניהול רכיבי תיק</h2><button class="ghost" onclick="document.getElementById('componentsModal').style.display='none'">סגור</button></div>
+        <p class="muted">רכיב = סוג נכס בתיק שלך. לדוגמה: "תיק ני"ע", "קופת גמל", "פק"מ", "נדל"ן להשקעה", "ביטקוין", "השתלמות".</p>
+        <div id="componentsList" style="margin:12px 0"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input id="newComponentName" type="text" placeholder="שם רכיב חדש (לדוגמה: תיק ני&quot;ע)" style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit"/>
+          <button id="addComponentBtn">הוסף</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="addMonthModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
+      <div class="card" style="max-width:680px;width:100%;max-height:85vh;overflow:auto">
+        <div class="row-flex"><h2 id="addMonthTitle">➕ הוסף נתוני חודש</h2><button class="ghost" onclick="document.getElementById('addMonthModal').style.display='none'">סגור</button></div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:13px;display:block;margin-bottom:6px">חודש</label>
+          <input id="monthInput" type="month" style="padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit;width:200px"/>
+        </div>
+        <p class="muted" style="margin-bottom:14px">הזן לכל רכיב את <b>שווי הסוף-חודש</b> ואת <b>הפקדה (או משיכה — סלילי)</b> שבוצעה בחודש זה.</p>
+        <div id="componentInputs"></div>
+        <div class="actions" style="margin-top:14px;justify-content:flex-end">
+          <button class="ghost" id="deleteMonthBtn" style="display:none;background:var(--bad);color:white">🗑️ מחק חודש</button>
+          <button id="saveMonthDataBtn">שמור</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="historyModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
+    <div class="card" style="max-width:720px;width:100%;max-height:80vh;overflow:auto">
+      <div class="row-flex"><h2>📅 חודשים שמורים</h2><button class="ghost" onclick="document.getElementById('historyModal').style.display='none'">סגור</button></div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
+    <div class="card" style="max-width:560px;width:100%;max-height:80vh;overflow:auto">
+      <div class="row-flex"><h2>⚙️ הגדרות וזיכרון</h2><button class="ghost" onclick="document.getElementById('settingsModal').style.display='none'">סגור</button></div>
+      <p class="muted">הדשבורד שומר היסטוריה ומיפוי בית-עסק→קטגוריה רק בדפדפן (localStorage). שום נתון לא עובר לשרת.</p>
+
+      <h3>📅 מחזור החשבון</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:13px">תאריך החתך קובע איך נחלקים החודשים. <b>אשראי</b>: חיוב ב-X לחודש = הוצאות מ-X לחודש הקודם עד X-1 לחודש החיוב. <b>בנק</b>: תנועות לפני יום X נכנסות לחודש הקודם.</p>
+      <div style="display:flex;gap:10px;align-items:end;margin-bottom:16px">
+        <label style="font-size:13px;flex:1">יום החתך (1-28)
+          <input id="setCutoffDay" type="number" min="1" max="28" style="display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;font-family:inherit"/>
+        </label>
+        <button id="saveCycleBtn">שמור</button>
+      </div>
+
+      <h3>מיפויים מותאמים שלמדו ידנית</h3>
+      <div id="customMappings" class="scrollY" style="max-height:300px"></div>
+      <div class="actions">
+        <button class="danger" id="clearMappingsBtn">מחק מיפויים</button>
+        <button class="danger" id="clearAllBtn">מחק הכל (כולל היסטוריה)</button>
+      </div>
+      <h3 style="margin-top:18px">💾 גיבוי ושחזור</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:13px">ייצא את כל הנתונים (חודשים, היסטוריה, מיפויים, השקעות) לקובץ JSON. ייבא בכל מכשיר/דפדפן.</p>
+      <div class="actions">
+        <button id="exportBackupBtn">⬇️ גבה הכל ל-JSON</button>
+        <label style="cursor:pointer"><button class="ghost" onclick="document.getElementById('importBackupInput').click()">⬆️ שחזר מקובץ</button><input type="file" id="importBackupInput" accept=".json" style="display:none"/></label>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = [
+  {id:"maaser",   name:"מעשר וצדקה",       color:"#8b5cf6", icon:"🤝"},
+  {id:"home",     name:"חשבונות הבית",     color:"#0ea5e9", icon:"🏠"},
+  {id:"insurance",name:"ביטוחים",          color:"#2563eb", icon:"🛡️"},
+  {id:"education",name:"חינוך וילדים",     color:"#f97316", icon:"🎒"},
+  {id:"food",     name:"מזון וצריכה",      color:"#10b981", icon:"🛒"},
+  {id:"resto",    name:"מסעדות וקפה",      color:"#f59e0b", icon:"🍽️"},
+  {id:"car",      name:"רכב ותחבורה",      color:"#ef4444", icon:"🚗"},
+  {id:"health",   name:"בריאות",           color:"#ec4899", icon:"💊"},
+  {id:"fashion",  name:"אופנה וקניות",     color:"#a855f7", icon:"👕"},
+  {id:"fun",      name:"בילויים ופנאי",    color:"#06b6d4", icon:"🎯"},
+  {id:"travel",   name:"חופשות וטיולים",   color:"#3b82f6", icon:"✈️"},
+  {id:"home_d",   name:"בית ועיצוב",       color:"#84cc16", icon:"🛋️"},
+  {id:"tech",     name:"טכנולוגיה ומדיה",  color:"#64748b", icon:"💻"},
+  {id:"transfer", name:"העברות וביט",      color:"#14b8a6", icon:"💸"},
+  {id:"invest",   name:"השקעות / העברות פנימיות", color:"#0891b2", icon:"💼", nonExpense:true},
+  {id:"other",    name:"אחר",              color:"#9ca3af", icon:"📦"},
+];
+const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c=>[c.id,c]));
+
+const SOURCE_MAP = {
+  "טיסות ותיירות":"travel","מסעדות, קפה וברים":"resto","מזון וצריכה":"food",
+  "פנאי, בידור וספורט":"fun","אופנה":"fashion","עיצוב הבית":"home_d",
+  "ביטוח":"insurance","שירותי תקשורת":"home","תחבורה ורכבים":"car",
+  "רפואה ובתי מרקחת":"health","חשמל ומחשבים":"tech","עירייה וממשלה":"home","העברת כספים":"transfer",
+};
+
+const KEYWORD_RULES = [
+  {cat:"invest", words:["נדב דהן","העברה ללאומי","העברה לבנק לאומי","ניירות ערך","מסחר עצמאי","בית השקעות","מיטב","אלטשולר","פסגות","איביאי","IBI","אקסלנס","הראל פיננסים","פק\"מ","פקדון","פיקדון","קופת גמל","קופ\"ג","השתלמות","קרן השתלמות"]},
+  {cat:"insurance", words:["ביטוח","הראל","הפניקס","הכשרה","מנורה","איילון","כלל ביטוח","כלל-ביטוח","מגדל","שלמה ביטוח","AIG","ביטוח לאומי","דיויד שילד","מנורה מבטחים","הכשרה חברה לביטוח"]},
+  {cat:"education", words:["גן ","גני ","פעוטון","צהרון","בית ספר","ביה\"ס","אגף החינוך","משרד החינוך","חוג ","חוגי","חינוך","אחזקת ילדים","קייטנה","ספרי לימוד","תלמוד תורה","ת\"ת","ישיבה לילדים","בית יעקב","מתנס","מתנ\"ס"]},
+  {cat:"maaser", words:["בבא סאלי","יביע אומר","הידברות","אהבתי חסד","שערי החיים","שובה ישראל","עד השם","אלוקיך","בית יוסף","ניחוחות חיים","משכן שילה","מאורות","ותן חלקנו","תורני","תורה","קירוב","חב\"ד","חבד","תורם","עניים","קופת העיר","קופת חסד","צדקה","מעשר","ישראל סבא","עזר מציון","יד שרה","הצלה","חסד","ע\"ר","עמותה","הקדש","קרן ל"]},
+  {cat:"travel", words:["איסתא","ISSTA","gulliver","ציוני דרך","טיולי","תיירות","דנאל","הוטל","hotel","booking","בוקינג","אגד תיירות","טיסה","el al","אל על","ארקיע","ויזאיר","airbnb","מלון","אכסניה","מלונית"]},
+  {cat:"transfer", words:["BIT","ביט","paybox","פייבוקס","העברת כספים"]},
+  {cat:"home_d", words:["SNOMMIS","איקאה","ikea","הום סנטר","ace","אייס","ביגדיל","ביג ","פוקס הום","עיצוב הבית","שטיח","ריהוט","סלון","מטבח","תאורה","פרגולה","TOOLS","כלי בית","למינציה"]},
+  {cat:"tech", words:["google","apple.com","apple ","microsoft","spotify","netflix","openai","chatgpt","claude","github","אמזון","amazon","יוטיוב","youtube","disney","stream","פלייסטיישן","steam","נינטנדו","xbox","מי עדן","עדן מים","itunes","קיי אס פי","KSP","ביג מחשבים"]},
+  {cat:"resto", words:["מסעדה","פיצה","פיצרי","המבורגר","שווארמה","סושי","קפה","קופי","ברגר","ארומה","גרג","cofix","נונה","ליון","ארקפה","פלאפל","חומוס","starbucks","mcdonald","BBB","KFC","דומינו","הכנאפה","WOLT","וולט","תן ביס","ten bis","קפיטריה","ברגרים"]},
+  {cat:"health", words:["סופר פארם","סופרפארם","סופר-פארם","ניו פארם","ניופארם","פארם","מכבידנט","דנטל","דנט","DENT","אופטיק","אופטיקה","משקפיים","פיזיו","פיזיותרפיה","רופא","מרפאה","קופ\"ח","קופת חולים","קרן מכבי","מכבי שירותי","שירותי בריאות כללית","מאוחדת","לאומית שירותי","בית מרקחת"]},
+  {cat:"fun", words:["מועדון","פיס פלוס","פיס מנוי","הטבות פיס","פיס נטען","טוטו","קולנוע","קולנע","סינמה","סינימה","yes planet","בריכה","ספא","ג'ים","gym","jym","פילטיס","pilates","סטודיו","יוגה","הפועל","מכבי תא","אקסטרים","escape","באולינג","צימר","בידור","תיאטרון","הצגה","הופעה","ticket","עינב","קונצרט","BE PILATES","גן החיות","ספארי","לונה פארק"]},
+  {cat:"fashion", words:["zara","castro","fox","american eagle","אמריקן איגל","טרמינל","river ","H&M","H & M","mango","פוקס","קסטרו","טופ טן","נעלי","שוז","footwear","JEWELRY","jewel","תכשיט","עגיל","שעון","name it","קרייזי ליין","TWENTYFOURSEVEN","שילב","צ'רלי בננה"]},
+  {cat:"car", words:["פז ","פז אפליק","יילו","yelo","דלק ","סונול","דור אלון","ten גז","פנגו","חניון","ארגמן","מוביט","און טיים","אמיגו","קאר","get taxi","gett","מוניות","אוטובוס","רכבת","דלקן"]},
+  {cat:"food", words:["שופרסל","יוחננוף","ויקטורי","רמי לוי","אושר עד","מחסני השוק","טיב טעם","היפר","סופר","מאפיה","מאפה","פרי","דובשנית","קצביה","פירות","ירקות","מינימרקט","מיני מרקט","קולמן","יינות ביתן","חצי חינם"]},
+  {cat:"home", words:["חברת חשמל","חשמל חברת","פרטנר","הוט","סלקום","בזק","HOT","cellcom","נטוויז'ן","מי ","מים ","תאגיד מים","ארנונה","עיריית","עירייה","סופרגז","אמישראגז","ועד בית","וועד"]},
+];
+
+const isInstallment = t => /תשלומים/.test(t||"") || /תשלום/.test(t||"");
+
+function categorize(merchant, sourceCat, customMap){
+  const m = (merchant||"").trim();
+  if(!m) return "other";
+  if(customMap[m]) return customMap[m];
+  const lc = m.toLowerCase();
+  for(const rule of KEYWORD_RULES){
+    for(const w of rule.words){
+      if(lc.includes(w.toLowerCase())) return rule.cat;
+    }
+  }
+  if(SOURCE_MAP[sourceCat]) return SOURCE_MAP[sourceCat];
+  return "other";
+}
+
+const STORAGE_KEYS = {history:"hozaot_history_v1", mapping:"hozaot_mapping_v1"};
+const loadMapping = ()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.mapping)||"{}"); } catch(e){ return {}; } };
+const saveMapping = m => localStorage.setItem(STORAGE_KEYS.mapping, JSON.stringify(m));
+const loadHistory = ()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.history)||"[]"); } catch(e){ return []; } };
+const saveHistory = h => localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(h));
+
+let CUSTOM_MAP = loadMapping();
+let HISTORY = loadHistory();
+let CURRENT = null;
+let BANK = null;
+let charts = {};
+
+const MONTHS_KEY = "hozaot_months_v1";
+const loadMonths = ()=>{ try{ return JSON.parse(localStorage.getItem(MONTHS_KEY)||"{}"); } catch(e){ return {}; } };
+const saveMonths = m => { try{ localStorage.setItem(MONTHS_KEY, JSON.stringify(m)); } catch(e){ alert("⚠️ אזל מקום בדפדפן — נסה למחוק חודשים ישנים."); } };
+let MONTHS = loadMonths();
+let SELECTED_MONTH = null;
+
+function monthKeyFromDateStr(dateStr){
+  if(!dateStr) return null;
+  if(typeof dateStr==="number"){
+    const d = new Date(Math.round((dateStr - 25569) * 86400 * 1000));
+    if(isNaN(d.getTime())) return null;
+    return `${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  }
+  const s = String(dateStr).trim();
+  const m = /(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2,4})/.exec(s);
+  if(!m) return null;
+  let year = m[3]; if(year.length===2) year = "20"+year;
+  return `${m[2].padStart(2,"0")}/${year}`;
+}
+
+const CYCLE_SETTINGS_KEY = "hozaot_cycle_settings_v1";
+function loadCycleSettings(){
+  try{ return Object.assign({cutoffDay:10}, JSON.parse(localStorage.getItem(CYCLE_SETTINGS_KEY)||"{}")); }
+  catch(e){ return {cutoffDay:10}; }
+}
+function saveCycleSettings(s){ localStorage.setItem(CYCLE_SETTINGS_KEY, JSON.stringify(s)); }
+let CYCLE = loadCycleSettings();
+
+function parseSimpleDate(s){
+  if(s==null || s==="") return null;
+  if(typeof s==="number"){
+    const d = new Date(Math.round((s - 25569) * 86400 * 1000));
+    if(isNaN(d.getTime())) return null;
+    return {day:d.getDate(), month:d.getMonth()+1, year:d.getFullYear()};
+  }
+  const str = String(s).trim();
+  const m = /(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2,4})/.exec(str);
+  if(!m) return null;
+  let year = +m[3]; if(year<100) year += 2000;
+  return {day:+m[1], month:+m[2], year};
+}
+
+function shiftMonthBack(key){
+  const m = /(\d{2})\/(\d{4})/.exec(key);
+  if(!m) return key;
+  let month = +m[1] - 1, year = +m[2];
+  if(month<1){ month = 12; year -= 1; }
+  return `${String(month).padStart(2,"0")}/${year}`;
+}
+
+function accountingMonthByDay(dateStr){
+  const d = parseSimpleDate(dateStr);
+  if(!d) return null;
+  let month = d.month, year = d.year;
+  const cutoff = +CYCLE.cutoffDay || 10;
+  if(d.day <= cutoff){
+    month -= 1;
+    if(month<1){ month = 12; year -= 1; }
+  }
+  return `${String(month).padStart(2,"0")}/${year}`;
+}
+
+function creditAccountingMonth(billDateStr){ return accountingMonthByDay(billDateStr); }
+function bankAccountingMonth(dateStr){ return accountingMonthByDay(dateStr); }
+
+const MONTH_NAMES = {"01":"ינואר","02":"פברואר","03":"מרץ","04":"אפריל","05":"מאי","06":"יוני","07":"יולי","08":"אוגוסט","09":"ספטמבר","10":"אוקטובר","11":"נובמבר","12":"דצמבר"};
+function monthLabel(key){
+  const m = /(\d{2})\/(\d{4})/.exec(key);
+  if(!m) return key;
+  return `${MONTH_NAMES[m[1]]||m[1]} ${m[2]}`;
+}
+function monthSortKey(key){
+  const m = /(\d{2})\/(\d{4})/.exec(key);
+  return m ? (+m[2])*100 + (+m[1]) : 0;
+}
+
+/* ── ניקוי תווי כיוון Unicode (RTL/LTR embedding) ── */
+function cleanDesc(s){ return (s||"").replace(/[\u202a-\u202e\u200e\u200f\u2066-\u2069]/g,"").trim(); }
+
+/* ── זיהוי חיוב אשראי בבנק (כדי לא לספור פעמיים) ── */
+/* FIX: נקה תווי Unicode לפני הבדיקה, והוסף דפוסים של ישראכרט-כ.ויזה ובנק יהב אשראי */
+const CC_PATTERNS = /כאל|מקס איט|מקס פיי|ישראכ|ישראכרט|ויזה|VISA|MASTERCARD|MAX|CAL|דיינרס|כרטיס אשראי|לאומי קארד|אמריקן אקספרס|דיסקונט - אשראי/i;
+const isCreditCardCharge = desc => CC_PATTERNS.test(cleanDesc(desc||""));
+
+/* ── parseExcel: תומך במקס/כאל ובויזה/ישראכרט ── */
+function parseExcel(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:"array", cellDates:false});
+  const allRows = [];
+  let billingMonth = null;
+
+  for(const sheetName of wb.SheetNames){
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+
+    const HEB_MONTHS_MAP = {"ינואר":"01","פברואר":"02","מרץ":"03","אפריל":"04","מאי":"05","יוני":"06","יולי":"07","אוגוסט":"08","ספטמבר":"09","אוקטובר":"10","נובמבר":"11","דצמבר":"12"};
+
+    /* ── חלץ תאריך חיוב וחודש מכותרת הקובץ (ויזה/ישראכרט) ── */
+    let visaBillDate = null;
+    for(let i=0;i<Math.min(rows.length,8);i++){
+      for(const cell of rows[i]||[]){
+        if(typeof cell!=="string") continue;
+        const cleaned = cleanDesc(cell);
+        /* "לחיוב ב-02.06" */
+        const bm = cleaned.match(/לחיוב ב[\-–]?(\d{1,2})[\.\/](\d{1,2})/);
+        if(bm && !visaBillDate){
+          let billYear = null;
+          outer: for(let j=0;j<Math.min(rows.length,5);j++){
+            for(const c of rows[j]||[]){
+              if(typeof c==="string"){ const ym=c.match(/(\d{4})/); if(ym){billYear=ym[1];break outer;} }
+            }
+          }
+          if(!billYear) billYear = new Date().getFullYear().toString();
+          visaBillDate = `${bm[1].padStart(2,"0")}-${bm[2].padStart(2,"0")}-${billYear}`;
+        }
+        /* "יוני 2026" */
+        if(!billingMonth){
+          for(const [heb,num] of Object.entries(HEB_MONTHS_MAP)){
+            const ym = cleaned.match(new RegExp(heb+"\\s*(\\d{4})"));
+            if(ym){ billingMonth = `${num}/${ym[1]}`; break; }
+          }
+        }
+        /* "05/2026" */
+        if(!billingMonth){
+          const mm = cleaned.match(/(\d{1,2})\/(\d{4})/);
+          if(mm) billingMonth = `${mm[1].padStart(2,"0")}/${mm[2]}`;
+        }
+      }
+    }
+
+    /* ── פורמט ויזה/ישראכרט: סרוק את כל הטבלאות (יכולות להיות כמה — ראשית + "חיוב מחוץ למועד") ── */
+    let processedAsVisa = false;
+    for(let i=0;i<rows.length;i++){
+      const r = rows[i]||[];
+      const hasDate = r.some(c=>typeof c==="string"&&cleanDesc(c)==="תאריך רכישה");
+      const hasMerch = r.some(c=>typeof c==="string"&&(cleanDesc(c)==="שם בית עסק"||cleanDesc(c)==="שם בית-עסק"));
+      if(!hasDate || !hasMerch) continue;
+      processedAsVisa = true;
+
+      /* גלה אם יש עמודת "חיוב בחשבון הבנק" — מציינת תאריך חיוב נפרד לכל שורה */
+      const hasBankDate = r.some(c=>typeof c==="string"&&cleanDesc(c)==="חיוב בחשבון הבנק");
+      const I2 = {
+        date:     r.findIndex(c=>typeof c==="string"&&cleanDesc(c)==="תאריך רכישה"),
+        merch:    r.findIndex(c=>typeof c==="string"&&(cleanDesc(c)==="שם בית עסק"||cleanDesc(c)==="שם בית-עסק")),
+        amount:   r.findIndex(c=>typeof c==="string"&&cleanDesc(c)==="סכום חיוב"),
+        notes:    r.findIndex(c=>typeof c==="string"&&(cleanDesc(c)==="פירוט נוסף"||cleanDesc(c)==="הערות")),
+        bankDate: r.findIndex(c=>typeof c==="string"&&cleanDesc(c)==="חיוב בחשבון הבנק"),
+      };
+      for(let j=i+1;j<rows.length;j++){
+        const row = rows[j];
+        if(!row) continue;
+        /* עצור לפני שורות תנאים משפטיים ארוכות */
+        if(row.some(c=>typeof c==="string"&&cleanDesc(c).startsWith("תנאים משפטיים"))) break;
+        /* דלג כותרות סעיף וסיכומים — אבל אל תעצור, כי יש טבלה נוספת אחריהן */
+        if(row.some(c=>typeof c==="string"&&/^(עסקאות|תאריך רכישה)/.test(cleanDesc(c)))) continue;
+        if(row.some(c=>typeof c==="string"&&/סה"כ/.test(c))) continue;
+        const merch = row[I2.merch];
+        const amt = parseFloat(row[I2.amount]);
+        if(!merch || isNaN(amt) || amt===0) continue;
+        let dateStr = row[I2.date] ? String(row[I2.date]).trim() : null;
+        /* המר 31.05.26 → 31-05-2026 */
+        if(dateStr && /^\d{1,2}\.\d{2}\.\d{2}$/.test(dateStr)){
+          const p = dateStr.split(".");
+          dateStr = `${p[0]}-${p[1]}-20${p[2]}`;
+        }
+        /* לעסקאות "חיוב מחוץ למועד" יש תאריך חיוב נפרד בעמודה האחרונה */
+        let rowBillDate = visaBillDate;
+        if(I2.bankDate>=0 && row[I2.bankDate]){
+          let bd = String(row[I2.bankDate]).trim();
+          if(/^\d{1,2}\.\d{2}\.\d{2}$/.test(bd)){
+            const p = bd.split(".");
+            bd = `${p[0]}-${p[1]}-20${p[2]}`;
+          }
+          rowBillDate = bd;
+        }
+        const notes = row[I2.notes] ? String(row[I2.notes]).trim() : "";
+        allRows.push({
+          date: dateStr,
+          merchant: cleanDesc(String(merch)),
+          sourceCat: "",
+          card: "ויזה",
+          type: /תשלום\s*\d+\s*מתוך/.test(notes) ? "תשלומים" : "",
+          amount: amt,
+          origAmount: amt,
+          billDate: rowBillDate,
+          notes: notes,
+          method: "",
+          sheet: sheetName,
+        });
+      }
+      break; /* עיבדנו את כל הגיליון כפורמט ויזה */
+    }
+    if(processedAsVisa) continue;
+
+    /* ── פורמט מקס/כאל המקורי ── */
+    let headerIdx = -1;
+    for(let i=0;i<Math.min(rows.length,8);i++){
+      const r = rows[i]||[];
+      if(r.some(c => typeof c==="string" && c.includes("תאריך עסקה"))){ headerIdx = i; break; }
+      if(typeof r[0]==="string" && /\d{2}\/\d{4}/.test(r[0])) billingMonth = r[0].match(/\d{2}\/\d{4}/)[0];
+    }
+    if(headerIdx === -1) continue;
+    const headers = rows[headerIdx];
+    const idx = name => headers.findIndex(h => typeof h==="string" && h.trim()===name);
+    const I = {
+      date:idx("תאריך עסקה"), merch:idx("שם בית העסק"), cat:idx("קטגוריה"),
+      card:idx("4 ספרות אחרונות של כרטיס האשראי"), type:idx("סוג עסקה"),
+      amount:idx("סכום חיוב"), origAmt:idx("סכום עסקה מקורי"),
+      bill:idx("תאריך חיוב"), notes:idx("הערות"), method:idx("אופן ביצוע ההעסקה"),
+    };
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r) continue;
+      const merch = r[I.merch];
+      const amt = parseFloat(r[I.amount]);
+      if(!merch || isNaN(amt)) continue;
+      if(typeof r[I.date]==="string" && r[I.date].trim()==="סך הכל") continue;
+      allRows.push({
+        date: r[I.date], merchant: String(merch).trim(),
+        sourceCat: r[I.cat] || "", card: r[I.card], type: r[I.type] || "",
+        amount: amt, origAmount: parseFloat(r[I.origAmt]) || amt,
+        billDate: r[I.bill], notes: r[I.notes] || "", method: r[I.method] || "",
+        sheet: sheetName,
+      });
+    }
+  }
+  return {transactions:allRows, billingMonth};
+}
+
+function excelDateToStr(serial){
+  const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+  if(isNaN(d.getTime())) return String(serial);
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
+function parseBankExcel(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:"array", cellDates:false});
+  const all = [];
+  const COL_DATE   = ["תאריך","תאריך עסקה","תאריך פעולה","תאריך ערך"];
+  const COL_DESC   = ["תיאור","תאור","פירוט","פרטים","תיאור פעולה","פרטי פעולה","שם בית עסק","שם פעולה","תיאור עסקה"];
+  const COL_AMT    = ["סכום","סכום בש\"ח","סכום בשח","סכום (ש\"ח)","amount"];
+  const COL_DEBIT  = ["חובה","חיוב","יציאה","חובה(₪)","חיוב(₪)"];
+  const COL_CREDIT = ["זכות","זיכוי","הפקדה","הכנסה","זכות(₪)","זיכוי(₪)"];
+  const COL_REF    = ["אסמכתא","מס' אסמכתא","מס אסמכתא","reference"];
+  const findCol = (headers, names) => {
+    for(let i=0;i<headers.length;i++){
+      const h = cleanDesc((headers[i]||"").toString());
+      for(const n of names){ if(h===n||h.includes(n)) return i; }
+    }
+    return -1;
+  };
+  for(const sheetName of wb.SheetNames){
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+    let headerIdx = -1;
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const r = rows[i]||[];
+      const txt = r.map(c=>cleanDesc((c||"").toString())).join("|");
+      if(/תאריך/.test(txt) && /חובה|זכות|סכום|תיאור|פירוט/.test(txt)){ headerIdx = i; break; }
+    }
+    if(headerIdx===-1) continue;
+    const headers = rows[headerIdx];
+    const I = {
+      date:   findCol(headers, COL_DATE),
+      desc:   findCol(headers, COL_DESC),
+      amt:    findCol(headers, COL_AMT),
+      debit:  findCol(headers, COL_DEBIT),
+      credit: findCol(headers, COL_CREDIT),
+      ref:    findCol(headers, COL_REF),
+    };
+    if(I.date<0 || I.desc<0) continue;
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r) continue;
+      const rawDesc = r[I.desc];
+      if(!rawDesc) continue;
+      const dateStr = r[I.date];
+      if(!dateStr) continue;
+      const dStr = cleanDesc(String(rawDesc));
+      if(/יתרה|סך הכל|סה"כ|total/i.test(dStr)) continue;
+      let amount = 0, isIncome = false;
+      if(I.debit>=0 || I.credit>=0){
+        const d = parseFloat(r[I.debit]) || 0;
+        const c = parseFloat(r[I.credit]) || 0;
+        if(d>0){ amount = d; isIncome = false; }
+        else if(c>0){ amount = c; isIncome = true; }
+        else continue;
+      } else if(I.amt>=0){
+        const v = parseFloat(r[I.amt]);
+        if(isNaN(v) || v===0) continue;
+        amount = Math.abs(v);
+        isIncome = v>0;
+      } else continue;
+      const dateVal = typeof dateStr==="number" ? excelDateToStr(dateStr) : cleanDesc(String(dateStr));
+      all.push({
+        date: dateVal,
+        description: dStr,
+        amount, isIncome,
+        ref: r[I.ref] || "",
+      });
+    }
+  }
+  return all;
+}
+
+function analyze(transactions){
+  let total = 0, investSum = 0;
+  const byCat = {}, byMerchant = {};
+  const installments = [], standingOrders = [], investments = [];
+  for(const t of transactions){
+    const cat = categorize(t.merchant, t.sourceCat, CUSTOM_MAP);
+    t._cat = cat;
+    const catDef = CAT_BY_ID[cat] || {};
+    if(catDef.nonExpense){
+      investSum += t.amount;
+      investments.push(t);
+      byCat[cat] = (byCat[cat]||0) + t.amount;
+      continue;
+    }
+    total += t.amount;
+    byCat[cat] = (byCat[cat]||0) + t.amount;
+    byMerchant[t.merchant] = (byMerchant[t.merchant]||{sum:0,count:0});
+    byMerchant[t.merchant].sum += t.amount;
+    byMerchant[t.merchant].count += 1;
+    if(typeof t.notes==="string"){
+      const m = t.notes.match(/תשלום\s*(\d+)\s*מתוך\s*(\d+)/);
+      if(m){ installments.push({...t,curIdx:+m[1],totalIdx:+m[2], remaining:+m[2]-+m[1]}); }
+      if(/הוראת קבע/.test(t.notes)) standingOrders.push(t);
+    }
+  }
+  return {transactions, total, investSum, byCat, byMerchant, installments, standingOrders, investments, count:transactions.length};
+}
+
+function analyzeBank(rows){
+  const income = [], expenses = [], investments = [];
+  let ccDebit = 0;
+  const byCat = {};
+  for(const r of rows){
+    if(!r.isIncome && isCreditCardCharge(r.description)){ ccDebit += r.amount; continue; }
+    if(r.isIncome){ income.push(r); continue; }
+    /* מפתח ייחודי לשיקים: תיאור|תאריך|סכום */
+    const bankKey = `${r.description}|${r.date}|${r.amount}`;
+    /* חוקים אוטומטיים לשיקים קבועים */
+    function autoCategorizeBankTx(desc, amount, date){
+      if(CUSTOM_MAP[bankKey]) return CUSTOM_MAP[bankKey];
+      const d = parseSimpleDate(date);
+      /* שיק 3650 ב-1 או 2 לחודש = שכירות → חשבונות הבית */
+      if(/שיק/i.test(desc) && Math.abs(amount-3650)<1 && d && d.day<=2) return "home";
+      /* בנק יהב-אשראי = החזר מסגרת → השקעות/העברות פנימיות */
+      if(/יהב.{0,3}אשראי/i.test(desc)) return "invest";
+      return null;
+    }
+    const cat = autoCategorizeBankTx(r.description, r.amount, r.date) || categorize(r.description, "", CUSTOM_MAP);
+    r._cat = cat;
+    r._bankKey = bankKey;
+    const catDef = CAT_BY_ID[cat] || {};
+    if(catDef.nonExpense){
+      investments.push(r);
+      continue;
+    }
+    expenses.push(r);
+    byCat[cat] = (byCat[cat]||0) + r.amount;
+  }
+  return {
+    transactions: rows, income, expenses, investments, ccDebit, byCat,
+    incomeSum: income.reduce((s,t)=>s+t.amount,0),
+    expensesSum: expenses.reduce((s,t)=>s+t.amount,0),
+    investmentsSum: investments.reduce((s,t)=>s+t.amount,0),
+  };
+}
+
+const NIS = n => "₪" + Math.round(n).toLocaleString("he-IL");
+const NIS2 = n => "₪" + n.toLocaleString("he-IL", {maximumFractionDigits:2});
+
+function renderCashflow(){
+  const el = document.getElementById("cashflowKpis");
+  if(!BANK){ el.style.display="none"; return; }
+  const creditExp = CURRENT ? CURRENT.total : 0;
+  const bankExp = BANK.expensesSum;
+  const totalExpenses = creditExp + bankExp;
+  const investAll = ((CURRENT && CURRENT.investSum) || 0) + (BANK.investmentsSum || 0);
+  const net = BANK.incomeSum - totalExpenses;
+  const sr = BANK.incomeSum>0 ? (net/BANK.incomeSum*100) : 0;
+  const items = [
+    {label:"💰 הכנסה החודש", value:NIS(BANK.incomeSum), note:`${BANK.income.length} תקבולים`, cls:"green"},
+    {label:"💸 סך הוצאות (אשראי + בנק)", value:NIS(totalExpenses), note: CURRENT?`אשראי ${NIS(creditExp)} · בנק ${NIS(bankExp)}`:`בנק בלבד`, cls:"amber"},
+    {label:net>=0?"📈 יתרה":"📉 גרעון", value:NIS(net), note: net>=0?"כסף שנשאר אחרי הוצאות":"חרגת מההכנסה", cls: net>=0?"green":"amber"},
+    {label:"💎 יחס חיסכון", value: BANK.incomeSum>0 ? sr.toFixed(1)+"%" : "—", note: sr>=20?"מצוין":sr>=10?"סביר":sr>=0?"נמוך":"שלילי", cls: sr>=10?"green":sr>=0?"amber":"purple"},
+  ];
+  if(investAll>0){
+    items.push({label:"💼 השקעות / העברות פנימיות", value:NIS(investAll), note:"לא נחשב כהוצאה", cls:"cyan"});
+  }
+  el.innerHTML = items.map(it=>`
+    <div class="card kpi ${it.cls}"><div class="accent"></div>
+      <div class="label">${it.label}</div>
+      <div class="value">${it.value}</div>
+      ${it.note?`<div class="delta">${it.note}</div>`:""}
+    </div>`).join("");
+  el.style.display="grid";
+}
+
+function renderKPIs(A, prev){
+  const reg = A.transactions.filter(t=>!isInstallment(t.type)).reduce((s,t)=>s+t.amount,0);
+  const inst = A.transactions.filter(t=>isInstallment(t.type)).reduce((s,t)=>s+t.amount,0);
+  const futureInst = A.installments.reduce((s,t)=>s+t.amount*t.remaining, 0);
+  const items = [
+    {label:"סה\"כ אשראי החודש", value:NIS(A.total), note: prev ? deltaNote(A.total, prev.total) : "", cls:"purple"},
+    {label:"מתוך זה: תשלומים", value:NIS(inst), note:`${A.installments.length} עסקאות פעילות`, cls:"amber"},
+    {label:"הוצאה רגילה (ללא תשלומים)", value:NIS(reg), note:"הקצב 'הרגיל' שלך", cls:"green"},
+    {label:"מחויב בעתיד מתשלומים", value:NIS(futureInst), note:"מהקרדיט הקיים", cls:"cyan"},
+  ];
+  document.getElementById("kpis").innerHTML = items.map(it=>`
+    <div class="card kpi ${it.cls}"><div class="accent"></div>
+      <div class="label">${it.label}</div>
+      <div class="value">${it.value}</div>
+      ${it.note?`<div class="delta">${it.note}</div>`:""}
+    </div>`).join("");
+}
+function deltaNote(cur, prevTotal){
+  if(!prevTotal) return "";
+  const d = cur - prevTotal;
+  const pct = (d/prevTotal*100);
+  const cls = d>=0 ? "up" : "down";
+  const arrow = d>=0 ? "▲" : "▼";
+  return `<span class="${cls}">${arrow} ${NIS(Math.abs(d))} (${pct.toFixed(1)}%) מול חודש קודם</span>`;
+}
+
+function combinedByCat(){
+  const merged = {};
+  if(CURRENT && CURRENT.byCat){
+    for(const [k,v] of Object.entries(CURRENT.byCat)) merged[k] = (merged[k]||0) + v;
+  }
+  if(BANK && BANK.byCat){
+    for(const [k,v] of Object.entries(BANK.byCat)) merged[k] = (merged[k]||0) + v;
+  }
+  return merged;
+}
+function combinedExpensesTotal(){
+  let s = 0;
+  const m = combinedByCat();
+  for(const [k,v] of Object.entries(m)){
+    const def = CAT_BY_ID[k] || {};
+    if(!def.nonExpense) s += v;
+  }
+  return s;
+}
+function combinedTxCountByCat(catId){
+  let n = 0;
+  if(CURRENT && CURRENT.transactions) n += CURRENT.transactions.filter(t=>t._cat===catId).length;
+  if(BANK && BANK.expenses) n += BANK.expenses.filter(t=>t._cat===catId).length;
+  if(BANK && BANK.investments) n += BANK.investments.filter(t=>t._cat===catId).length;
+  return n;
+}
+
+function renderCatChart(){
+  const byCat = combinedByCat();
+  const labels=[], data=[], colors=[];
+  CATEGORIES.forEach(c=>{
+    const v = byCat[c.id] || 0;
+    if(v>0){
+      const isInvest = !!c.nonExpense;
+      labels.push(`${c.icon} ${c.name}${isInvest?" (לא הוצאה)":""}`);
+      data.push(Math.round(v));
+      colors.push(c.color);
+    }
+  });
+  if(charts.cat) charts.cat.destroy();
+  if(!labels.length){ document.getElementById("catChart").parentElement.innerHTML = '<div class="empty">אין נתונים</div>'; return; }
+  charts.cat = new Chart(document.getElementById("catChart"), {
+    type:"doughnut",
+    data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:"#fff"}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"left",rtl:true,labels:{font:{family:"Heebo",size:12},boxWidth:14,padding:10}}, tooltip:{rtl:true, callbacks:{label:ctx=>` ${ctx.label}: ${NIS(ctx.parsed)}`}}}}
+  });
+}
+function renderCatTable(){
+  const tbody = document.querySelector("#catTable tbody");
+  const byCat = combinedByCat();
+  const expensesTotal = combinedExpensesTotal();
+  const rows = CATEGORIES.map(c=>({c, sum:byCat[c.id]||0})).filter(x=>x.sum>0).sort((a,b)=>b.sum-a.sum);
+  if(!rows.length){ tbody.innerHTML = `<tr><td colspan="4" class="empty">אין נתונים</td></tr>`; return; }
+  tbody.innerHTML = rows.map(({c,sum})=>{
+    const isInvest = !!c.nonExpense;
+    const pct = (isInvest || !expensesTotal) ? null : (sum/expensesTotal*100);
+    const count = combinedTxCountByCat(c.id);
+    return `<tr${isInvest?' style="opacity:.65;font-style:italic"':''}>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:99px;background:${c.color};margin-left:6px"></span>${c.icon} ${c.name}${isInvest?' <span style="font-size:11px;color:#0891b2">(לא הוצאה)</span>':''}</td>
+      <td class="num">${NIS(sum)}</td>
+      <td class="num">${pct!=null?pct.toFixed(1)+"%":"—"}${pct!=null?`<div class="bar"><i style="width:${Math.min(100,pct).toFixed(1)}%;background:${c.color}"></i></div>`:""}</td>
+      <td class="num">${count}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderInstallments(A){
+  const tbody = document.querySelector("#instTable tbody");
+  if(!A.installments.length){ tbody.innerHTML = `<tr><td colspan="5" class="empty">אין תשלומים פעילים החודש 🎉</td></tr>`; document.getElementById("instSummary").innerText=""; return;}
+  const future = A.installments.reduce((s,t)=>s+t.amount*t.remaining, 0);
+  document.getElementById("instSummary").innerText = `${A.installments.length} פעילים · מחויב בעתיד: ${NIS(future)}`;
+  tbody.innerHTML = A.installments.sort((a,b)=>b.amount-a.amount).map(t=>{
+    const c = CAT_BY_ID[t._cat]||CAT_BY_ID.other;
+    const remPill = t.remaining===0?'<span class="pill good">אחרון!</span>':t.remaining<=2?`<span class="pill warn">${t.remaining} נותרו</span>`:`<span class="pill info">${t.remaining} נותרו</span>`;
+    return `<tr>
+      <td>${t.merchant}</td>
+      <td><span class="pill" style="background:${c.color}22;color:${c.color}">${c.icon} ${c.name}</span></td>
+      <td class="num">${NIS(t.amount)}</td>
+      <td>${remPill} <span class="muted">(${t.curIdx}/${t.totalIdx})</span></td>
+      <td class="num">${NIS(t.amount*t.remaining)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderStandingOrders(A){
+  const tbody = document.querySelector("#hokTable tbody");
+  if(!A.standingOrders.length){ tbody.innerHTML = `<tr><td colspan="3" class="empty">לא זוהו הוראות קבע</td></tr>`; document.getElementById("hokSummary").innerText=""; return;}
+  const sum = A.standingOrders.reduce((s,t)=>s+t.amount, 0);
+  document.getElementById("hokSummary").innerText = `${A.standingOrders.length} · ${NIS(sum)} לחודש`;
+  tbody.innerHTML = A.standingOrders.sort((a,b)=>b.amount-a.amount).map(t=>{
+    const c = CAT_BY_ID[t._cat]||CAT_BY_ID.other;
+    return `<tr>
+      <td>${t.merchant}</td>
+      <td><span class="pill" style="background:${c.color}22;color:${c.color}">${c.icon} ${c.name}</span></td>
+      <td class="num">${NIS2(t.amount)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderTopMerchants(A){
+  const list = Object.entries(A.byMerchant).map(([m,v])=>({m,...v})).sort((a,b)=>b.sum-a.sum).slice(0,12);
+  const max = list[0]?.sum || 1;
+  document.getElementById("topMerchants").innerHTML = list.map(x=>`
+    <div style="margin-bottom:10px">
+      <div class="row-flex"><span style="font-weight:600">${x.m}</span><span class="num" style="font-weight:700">${NIS(x.sum)}</span></div>
+      <div class="bar"><i style="width:${(x.sum/max*100).toFixed(1)}%"></i></div>
+      <div class="muted" style="font-size:12px">${x.count} עסקאות · ממוצע ${NIS(x.sum/x.count)}</div>
+    </div>`).join("");
+}
+
+function renderInsights(A, prev){
+  const ins = [];
+  if(A.installments.length){
+    const instSum = A.installments.reduce((s,t)=>s+t.amount,0);
+    const pct = instSum/A.total*100;
+    const future = A.installments.reduce((s,t)=>s+t.amount*t.remaining,0);
+    ins.push({type:"warn",icon:"💳",text:`<b>${pct.toFixed(0)}% מהאשראי החודש (${NIS(instSum)}) הם תשלומי קרדיט מעסקאות עבר.</b> נותר עוד <b>${NIS(future)}</b> מחויב מהקרדיט הקיים. הוצאה "רגילה" החודש: <b>${NIS(A.total-instSum)}</b>.`});
+    const lastPayments = A.installments.filter(t=>t.remaining===0);
+    if(lastPayments.length){
+      ins.push({type:"good",icon:"🎉",text:`<b>חודש הבא תרגיש הקלה:</b> ${lastPayments.length} תשלומים מסיימים החודש — ${lastPayments.map(t=>`${t.merchant} (${NIS(t.amount)})`).join(", ")}. חיסכון מהחודש הבא: <b>${NIS(lastPayments.reduce((s,t)=>s+t.amount,0))}/חודש</b>.`});
+    }
+  }
+  const resto = A.byCat.resto || 0;
+  const food = A.byCat.food || 0;
+  if(resto>0 && food>0 && resto>food*0.7){
+    ins.push({type:"warn",icon:"🍽️",text:`<b>מסעדות וקפה גבוה:</b> ${NIS(resto)} (${(resto/A.total*100).toFixed(0)}% מהחשבון). הוצאת ${(resto/food*100).toFixed(0)}% ממה שעל מצרכים. בילוי פעם בשבוע במקום פעם ב-3 ימים = ~${NIS(resto*0.4)}/חודש.`});
+  }
+  if(A.standingOrders.length){
+    const insurances = A.standingOrders.filter(t=>/ביטוח|הראל|הפניקס|מנורה|איילון|כלל|מגדל/i.test(t.merchant));
+    if(insurances.length>=2){
+      const sum = insurances.reduce((s,t)=>s+t.amount,0);
+      ins.push({type:"info",icon:"🛡️",text:`<b>${insurances.length} ביטוחים פעילים</b> בהוראת קבע: ${insurances.map(t=>t.merchant).join(", ")}, סה"כ ${NIS2(sum)}/חודש. שווה לבדוק כפילויות.`});
+    }
+  }
+  if(prev){
+    const d = A.total - prev.total;
+    if(Math.abs(d)>=300){
+      ins.push({type: d>=0?"warn":"good", icon: d>=0?"📈":"📉", text:`<b>${d>=0?"גבוה":"נמוך"} ב-${NIS(Math.abs(d))}</b> מ-${prev.label} (${(d/prev.total*100).toFixed(1)}%).`});
+    }
+    const jumps = [];
+    CATEGORIES.forEach(c=>{
+      const cur = A.byCat[c.id]||0;
+      const pv = prev.byCat[c.id]||0;
+      if(cur>200 && pv>0 && cur > pv*1.4){ jumps.push({c, cur, pv, diff: cur-pv}); }
+    });
+    jumps.sort((a,b)=>b.diff-a.diff).slice(0,2).forEach(j=>{
+      ins.push({type:"info",icon:j.c.icon,text:`קטגוריה <b>${j.c.name}</b> זינקה: ${NIS(j.pv)} → <b>${NIS(j.cur)}</b> (+${(j.diff/j.pv*100).toFixed(0)}%).`});
+    });
+  } else {
+    ins.push({type:"info",icon:"📊",text:`זה החודש הראשון בדשבורד. לחץ "💾 שמור החודש" בתחתית כדי לקבל השוואה אוטומטית בחודש הבא.`});
+  }
+  const top = Object.entries(A.byMerchant).map(([m,v])=>({m,...v})).sort((a,b)=>b.sum-a.sum)[0];
+  if(top) ins.push({type:"info",icon:"🏆",text:`<b>בית העסק הגדול ביותר החודש:</b> ${top.m} — ${NIS(top.sum)} (${top.count} עסקאות).`});
+  if(BANK){
+    const totalExp = A.total + BANK.expensesSum;
+    const net = BANK.incomeSum - totalExp;
+    const sr = BANK.incomeSum>0 ? net/BANK.incomeSum*100 : 0;
+    if(net<0){
+      ins.push({type:"bad",icon:"🚨",text:`<b>תזרים שלילי:</b> הוצאת ${NIS(totalExp)} מתוך הכנסה של ${NIS(BANK.incomeSum)} — חריגה של <b>${NIS(-net)}</b>.`});
+    } else if(sr<10){
+      ins.push({type:"warn",icon:"💎",text:`<b>יחס חיסכון נמוך:</b> ${sr.toFixed(1)}% החודש (${NIS(net)}). הכלל המקובל הוא 10–20%.`});
+    } else if(sr>=20){
+      ins.push({type:"good",icon:"💎",text:`<b>יחס חיסכון מצוין:</b> ${sr.toFixed(1)}% — ${NIS(net)} נשארו החודש.`});
+    }
+    if(BANK.ccDebit){
+      ins.push({type:"info",icon:"🔀",text:`זיהיתי וסיננתי <b>${NIS(BANK.ccDebit)}</b> של חיוב כרטיס אשראי בעו"ש כדי לא לספור פעמיים.`});
+    }
+    if(BANK.expensesSum>0){
+      ins.push({type:"info",icon:"🏦",text:`<b>${BANK.expenses.length} הוצאות ישירות מהבנק</b> (לא דרך אשראי): ${NIS(BANK.expensesSum)}. רשימה למטה.`});
+    }
+  }
+  document.getElementById("insights").innerHTML = ins.map(i=>`<div class="insight ${i.type}"><div class="ic">${i.icon}</div><div class="body">${i.text}</div></div>`).join("");
+}
+
+function renderMonthCompare(A){
+  const el = document.getElementById("monthCompare");
+  if(!HISTORY.length){ el.innerHTML = `<div class="empty">לא נשמרו עדיין חודשים. שמור את החודש (כפתור בתחתית) כדי לראות השוואה.</div>`; return; }
+  const labels = HISTORY.map(h=>h.label).concat(["החודש (לא שמור)"]);
+  const totals = HISTORY.map(h=>h.total).concat([A.total]);
+  el.innerHTML = `<canvas id="trendChart" style="max-height:260px"></canvas>`;
+  if(charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(document.getElementById("trendChart"), {
+    type:"bar",
+    data:{labels, datasets:[{data:totals, backgroundColor:totals.map((_,i)=>i===totals.length-1?"#8b5cf6":"#c7d2fe"), borderRadius:8}]},
+    options:{responsive:true, plugins:{legend:{display:false}, tooltip:{rtl:true, callbacks:{label:ctx=>NIS(ctx.parsed.y)}}}, scales:{y:{ticks:{callback:v=>NIS(v)}}}}
+  });
+}
+
+function renderBankSection(){
+  const sec = document.getElementById("bankSection");
+  if(!BANK){ sec.style.display="none"; return; }
+  sec.style.display="grid";
+  const it = document.querySelector("#incomeTable tbody");
+  document.getElementById("incomeSummary").innerText = `${BANK.income.length} · ${NIS(BANK.incomeSum)}`;
+  if(!BANK.income.length) it.innerHTML = `<tr><td colspan="3" class="empty">אין הכנסות בחודש זה</td></tr>`;
+  else it.innerHTML = BANK.income.sort((a,b)=>b.amount-a.amount).map(r=>`
+    <tr><td class="muted" style="font-size:12px">${r.date}</td><td>${r.description}</td><td class="num" style="color:#10b981">+${NIS2(r.amount)}</td></tr>`).join("");
+
+  const et = document.querySelector("#bankExpTable tbody");
+  const allDebits = (BANK.expenses||[]).concat(BANK.investments||[]).sort((a,b)=>b.amount-a.amount);
+  const summary = `${BANK.expenses.length} הוצאות · ${NIS(BANK.expensesSum)}`
+    + (BANK.investmentsSum>0 ? ` · ${BANK.investments.length} השקעות (${NIS(BANK.investmentsSum)})` : "")
+    + (BANK.ccDebit ? ` · סוננו ${NIS(BANK.ccDebit)} חיוב כרטיס` : "");
+  document.getElementById("bankExpSummary").innerText = summary;
+  if(!allDebits.length){ et.innerHTML = `<tr><td colspan="4" class="empty">אין הורדות מהבנק</td></tr>`; return; }
+  et.innerHTML = allDebits.map(r=>{
+    const c = CAT_BY_ID[r._cat] || CAT_BY_ID.other;
+    const opts = CATEGORIES.map(cc=>`<option value="${cc.id}" ${cc.id===r._cat?"selected":""}>${cc.icon} ${cc.name}</option>`).join("");
+    const isInvest = !!c.nonExpense;
+    return `<tr${isInvest?' style="opacity:.75"':''}>
+      <td class="muted" style="font-size:12px">${r.date}</td>
+      <td>${r.description}</td>
+      <td><select data-bank-key="${(r._bankKey||`${r.description}|${r.date}|${r.amount}`).replace(/"/g,'&quot;')}" style="background:${c.color}11;color:${c.color};border-color:${c.color}33;font-size:12px">${opts}</select></td>
+      <td class="num" style="color:${isInvest?'#0891b2':'#ef4444'}">${isInvest?'💼 ':''}${NIS2(r.amount)}</td>
+    </tr>`;
+  }).join("");
+  et.querySelectorAll("select[data-bank-key]").forEach(sel=>{
+    sel.addEventListener("change", e=>{
+      const key = e.target.dataset.bankKey;
+      const newCat = e.target.value;
+      CUSTOM_MAP[key] = newCat;
+      saveMapping(CUSTOM_MAP);
+      if(BANK && BANK.transactions){ BANK = analyzeBank(BANK.transactions); }
+      if(CURRENT) renderAll(CURRENT, prevMonthSnapshot());
+      else { renderCashflow(); renderCatChart(); renderCatTable(); renderBankSection(); }
+    });
+  });
+}
+
+function renderTransactions(A, filter=""){
+  const tbody = document.querySelector("#txTable tbody");
+  const rows = A.transactions
+    .filter(t=>!filter || t.merchant.toLowerCase().includes(filter.toLowerCase()))
+    .sort((a,b)=>b.amount-a.amount);
+  tbody.innerHTML = rows.map(t=>{
+    const c = CAT_BY_ID[t._cat]||CAT_BY_ID.other;
+    const opts = CATEGORIES.map(cc=>`<option value="${cc.id}" ${cc.id===t._cat?"selected":""}>${cc.icon} ${cc.name}</option>`).join("");
+    return `<tr>
+      <td class="muted" style="font-size:12px">${t.date||""}</td>
+      <td>${t.merchant}</td>
+      <td><select data-merchant="${t.merchant.replace(/"/g,'&quot;')}" style="background:${c.color}11;color:${c.color};border-color:${c.color}33">${opts}</select></td>
+      <td class="num">${NIS2(t.amount)}</td>
+      <td><span class="pill ${isInstallment(t.type)?'warn':''}">${t.type||"רגילה"}</span></td>
+    </tr>`;
+  }).join("");
+  tbody.querySelectorAll("select").forEach(sel=>{
+    sel.addEventListener("change", e=>{
+      const m = e.target.dataset.merchant;
+      const newCat = e.target.value;
+      CUSTOM_MAP[m] = newCat;
+      saveMapping(CUSTOM_MAP);
+      CURRENT.transactions.forEach(t=>{ if(t.merchant===m) t._cat = newCat; });
+      const A2 = analyze(CURRENT.transactions);
+      CURRENT = A2;
+      if(BANK && BANK.transactions){ BANK = analyzeBank(BANK.transactions); }
+      renderAll(A2, prevMonthSnapshot());
+    });
+  });
+}
+
+function renderAll(A, prev){
+  renderBreakdown();
+  renderCashflow();
+  renderKPIs(A, prev);
+  renderCatChart();
+  renderCatTable();
+  renderInsights(A, prev);
+  renderInstallments(A);
+  renderStandingOrders(A);
+  renderTopMerchants(A);
+  renderMonthCompare(A);
+  renderBankSection();
+  renderTransactions(A, document.getElementById("search").value||"");
+}
+
+
+/* ============================================================
+   פילוח תקציבי
+   ============================================================ */
+const BREAKDOWN_MAP = {
+  basic:   ["home","insurance","education","food","car","health","home_d"],
+  luxury:  ["resto","fun","travel","fashion","tech"],
+  invest:  ["invest"],
+  maaser:  ["maaser"],
+  // transfer + other = לא מסווגים, יוצגו כ"לא מוסבר" עם אפשרות סיווג
+};
+/* כל הקטגוריות שמשויכות לקבוצה */
+const ALL_MAPPED_CATS = [...BREAKDOWN_MAP.basic, ...BREAKDOWN_MAP.luxury, ...BREAKDOWN_MAP.invest, ...BREAKDOWN_MAP.maaser];
+
+function renderBreakdown(){
+  const el = document.getElementById("breakdownContent");
+  if(!el) return;
+  if(!CURRENT && !BANK){ el.innerHTML = '<div class="empty">טען חודש כדי לראות פילוח</div>'; return; }
+
+  const byCat = combinedByCat();
+  const maaserAmt  = byCat["maaser"] || 0;
+  const grossIncome = BANK ? BANK.incomeSum : 0;
+  const netIncome  = grossIncome - maaserAmt;
+  const basicAmt   = BREAKDOWN_MAP.basic.reduce((s,c)=>s+(byCat[c]||0), 0);
+  const luxuryAmt  = BREAKDOWN_MAP.luxury.reduce((s,c)=>s+(byCat[c]||0), 0);
+  const investAmt  = BREAKDOWN_MAP.invest.reduce((s,c)=>s+(byCat[c]||0), 0);
+
+  /* עסקאות לא מסווגות = קטגוריות שלא ב-ALL_MAPPED_CATS */
+  function getUnclassifiedTxs(){
+    const txs = [];
+    if(CURRENT && CURRENT.transactions){
+      CURRENT.transactions.forEach(t=>{ if(!ALL_MAPPED_CATS.includes(t._cat)) txs.push({...t, _src:"credit"}); });
+    }
+    if(BANK && BANK.expenses){
+      BANK.expenses.forEach(t=>{ if(!ALL_MAPPED_CATS.includes(t._cat)) txs.push({...t, merchant:t.description, _src:"bank"}); });
+    }
+    return txs.sort((a,b)=>b.amount-a.amount);
+  }
+
+  /* כל עסקאות של קטגוריה מסוימת */
+  function txsForCat(catId){
+    const txs = [];
+    if(CURRENT && CURRENT.transactions)
+      CURRENT.transactions.filter(t=>t._cat===catId).forEach(t=>txs.push({...t, merchant: t.merchant, _src:"credit"}));
+    if(BANK && BANK.expenses)
+      BANK.expenses.filter(t=>t._cat===catId).forEach(t=>txs.push({...t, merchant: t.description, _src:"bank"}));
+    if(BANK && BANK.investments)
+      BANK.investments.filter(t=>t._cat===catId).forEach(t=>txs.push({...t, merchant: t.description, _src:"bank"}));
+    return txs.sort((a,b)=>b.amount-a.amount);
+  }
+
+  function txRows(txs){
+    if(!txs.length) return "";
+    return `<div style="margin-top:8px;max-height:220px;overflow-y:auto">` +
+      txs.map(t=>{
+        const merchant = t.merchant || "";
+        const curCat = t._cat || "other";
+        const opts = CATEGORIES.map(cc=>`<option value="${cc.id}" ${cc.id===curCat?"selected":""}>${cc.icon} ${cc.name}</option>`).join("");
+        const c2 = CAT_BY_ID[curCat] || CAT_BY_ID.other;
+        return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${merchant}">${merchant}</span>
+          <select data-bd-merchant="${merchant.replace(/"/g,'&quot;')}" data-bd-src="${t._src}"
+            style="font-size:11px;padding:2px 5px;background:${c2.color}11;color:${c2.color};border:1px solid ${c2.color}33;border-radius:6px">${opts}</select>
+          <span style="font-weight:600;white-space:nowrap">${NIS(t.amount)}</span>
+        </div>`;
+      }).join("") + `</div>`;
+  }
+
+  function groupCard(title, icon, color, amt, ids){
+    const p = netIncome > 0 ? (amt/netIncome*100).toFixed(1) : "—";
+    const barW = netIncome > 0 ? Math.min(100, amt/netIncome*100).toFixed(1) : 0;
+    /* פירוט לפי תת-קטגוריה + עסקאות */
+    const catDetail = ids.map(id=>{
+      const v = byCat[id] || 0;
+      if(!v) return "";
+      const c = CAT_BY_ID[id];
+      const txs = txsForCat(id);
+      return `<details style="margin-bottom:4px">
+        <summary style="cursor:pointer;display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;list-style:none;user-select:none">
+          <span>▸ ${c.icon} ${c.name}</span>
+          <span style="font-weight:700">${NIS(v)}</span>
+        </summary>
+        ${txRows(txs)}
+      </details>`;
+    }).join("");
+    return `<div class="card" style="border-top:3px solid ${color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div><div style="font-size:22px;margin-bottom:2px">${icon}</div><h3 style="margin:0">${title}</h3></div>
+        <div style="text-align:left">
+          <div style="font-size:26px;font-weight:800;color:${color}">${NIS(amt)}</div>
+          <div style="font-size:13px;color:var(--muted)">${p !== "—" ? p+"% מהשכר נטו" : "—"}</div>
+        </div>
+      </div>
+      <div class="bar" style="margin-bottom:12px"><i style="width:${barW}%;background:${color}"></i></div>
+      ${catDetail}
+    </div>`;
+  }
+
+  /* כרטיס מעשר עם פירוט */
+  function maaserCard(){
+    const v = byCat["maaser"] || 0;
+    if(!v) return "";
+    const txs = txsForCat("maaser");
+    return `<div class="card" style="border-top:3px solid #8b5cf6;grid-column:1/-1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><div style="font-size:22px;margin-bottom:2px">🤝</div><h3 style="margin:0">מעשר וצדקה</h3></div>
+        <div style="font-size:22px;font-weight:800;color:#8b5cf6">${NIS(v)}</div>
+      </div>
+      ${txRows(txs)}
+    </div>`;
+  }
+
+  const incomeRow = !BANK ? "" : `
+    <div class="card" style="border-top:3px solid #10b981">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+        <div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">💰 הכנסה גולמית</div>
+          <div style="font-size:22px;font-weight:800;color:#10b981">${NIS(grossIncome)}</div>
+        </div>
+        <div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">🤝 מעשר</div>
+          <div style="font-size:22px;font-weight:800;color:#8b5cf6">${NIS(maaserAmt)}</div>
+          <div style="font-size:11px;color:var(--muted)">${grossIncome>0?(maaserAmt/grossIncome*100).toFixed(1)+"%":""}</div>
+        </div>
+        <div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:4px">✳️ שכר נטו</div>
+          <div style="font-size:22px;font-weight:800;color:#0ea5e9">${NIS(netIncome)}</div>
+        </div>
+      </div>
+    </div>`;
+
+  /* לא מסווג */
+  const unclassified = getUnclassifiedTxs();
+  const unclassifiedAmt = unclassified.reduce((s,t)=>s+t.amount, 0);
+  function unclassifiedRows(){
+    if(!unclassified.length) return '<div style="font-size:13px;color:var(--muted);padding:8px 0">אין עסקאות לא מסווגות 🎉</div>';
+    return unclassified.map(t=>{
+      const merchant = t.merchant || t.description || "";
+      const curCat = t._cat || "other";
+      const opts = CATEGORIES.map(cc=>`<option value="${cc.id}" ${cc.id===curCat?"selected":""}>${cc.icon} ${cc.name}</option>`).join("");
+      const c = CAT_BY_ID[curCat] || CAT_BY_ID.other;
+      return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${merchant}">${merchant}</span>
+        <select data-bd-merchant="${merchant.replace(/"/g,'&quot;')}" data-bd-src="${t._src}"
+          style="font-size:11px;padding:3px 6px;background:${c.color}11;color:${c.color};border:1px solid ${c.color}33;border-radius:6px">${opts}</select>
+        <span style="font-weight:700;white-space:nowrap">${NIS(t.amount)}</span>
+      </div>`;
+    }).join("");
+  }
+
+  const unclassifiedCard = `<div class="card" style="border-top:3px solid #9ca3af">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div><div style="font-size:22px;margin-bottom:2px">❓</div><h3 style="margin:0">לא מסווג</h3></div>
+      <div style="text-align:left">
+        <div style="font-size:26px;font-weight:800;color:#9ca3af">${NIS(unclassifiedAmt)}</div>
+        <div style="font-size:12px;color:var(--muted)">שנה קטגוריה ← ייספר אוטומטית</div>
+      </div>
+    </div>
+    <div style="max-height:320px;overflow-y:auto">${unclassifiedRows()}</div>
+  </div>`;
+
+  el.innerHTML = `
+    <div style="display:grid;gap:16px">
+      ${incomeRow}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+        ${groupCard("צריכה בסיסית","🏠","#0ea5e9", basicAmt, BREAKDOWN_MAP.basic)}
+        ${groupCard("מותרות","🎯","#f59e0b", luxuryAmt, BREAKDOWN_MAP.luxury)}
+        ${groupCard("השקעות וחסכון","💼","#6366f1", investAmt, BREAKDOWN_MAP.invest)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+        ${maaserCard()}
+      </div>
+      ${unclassifiedCard}
+    </div>`;
+
+  /* bind שינוי קטגוריה */
+  el.querySelectorAll("select[data-bd-merchant]").forEach(sel=>{
+    sel.addEventListener("change", e=>{
+      const merchant = e.target.dataset.bdMerchant;
+      const newCat = e.target.value;
+      CUSTOM_MAP[merchant] = newCat;
+      saveMapping(CUSTOM_MAP);
+      /* עדכן עסקאות */
+      if(CURRENT) CURRENT.transactions.forEach(t=>{ if((t.merchant||"")=== merchant) t._cat = newCat; });
+      if(BANK){
+        BANK.expenses.forEach(t=>{ if((t.description||"")=== merchant) t._cat = newCat; });
+        BANK.investments = BANK.investments||[];
+        BANK = analyzeBank(BANK.transactions);
+      }
+      if(CURRENT){ CURRENT = analyze(CURRENT.transactions); }
+      renderBreakdown();
+    });
+  });
+}
+
+async function detectAndParse(file){
+  const buf = await file.arrayBuffer();
+  const credit = parseExcel(buf);
+  if(credit.transactions.length) return {type:"credit", data:credit, file};
+  const bank = parseBankExcel(buf);
+  if(bank.length) return {type:"bank", data:bank, file};
+  return null;
+}
+
+async function handleFiles(files){
+  if(!files || !files.length) return;
+  const status = document.getElementById("uploadStatus");
+  status.innerText = `🔄 מעבד ${files.length} קבצים...`;
+  const errors = [];
+  let creditAdded = 0, bankAdded = 0, monthsAffected = new Set();
+  for(const file of files){
+    try{
+      const result = await detectAndParse(file);
+      if(!result){ errors.push(`${file.name}: לא זוהה כקובץ אשראי או בנק`); continue; }
+      if(result.type==="credit"){
+        const fileMonthFromHeader = result.data.billingMonth ? normalizeBillingMonth(result.data.billingMonth) : null;
+        const fileAccountingMonth = fileMonthFromHeader ? shiftMonthBack(fileMonthFromHeader) : null;
+        const buckets = {};
+        for(const t of result.data.transactions){
+          const mk = creditAccountingMonth(t.billDate) || fileAccountingMonth || bankAccountingMonth(t.date);
+          if(!mk) continue;
+          (buckets[mk] = buckets[mk] || []).push(t);
+        }
+        if(!Object.keys(buckets).length){ errors.push(`${file.name}: לא הצלחתי לזהות חודש חיוב`); continue; }
+        for(const [mk, txs] of Object.entries(buckets)){
+          if(!MONTHS[mk]) MONTHS[mk] = {};
+          const existing = MONTHS[mk].creditTransactions || [];
+          const seen = new Set(existing.map(t=>`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`));
+          const merged = existing.slice();
+          for(const t of txs){
+            const k = `${t.date}|${t.merchant}|${t.amount}|${t.billDate}`;
+            if(!seen.has(k)){ merged.push(t); seen.add(k); }
+          }
+          MONTHS[mk].creditTransactions = merged;
+          MONTHS[mk].creditFileName = file.name;
+          creditAdded++; monthsAffected.add(mk);
+        }
+      } else {
+        const buckets = {};
+        for(const r of result.data){
+          const mk = bankAccountingMonth(r.date);
+          if(!mk) continue;
+          (buckets[mk] = buckets[mk] || []).push(r);
+        }
+        for(const [mk, rows] of Object.entries(buckets)){
+          if(!MONTHS[mk]) MONTHS[mk] = {};
+          const existing = MONTHS[mk].bankTransactions || [];
+          const merged = existing.slice();
+          const seen = new Set(existing.map(r=>`${r.date}|${r.description}|${r.amount}|${r.isIncome}`));
+          for(const r of rows){
+            const k = `${r.date}|${r.description}|${r.amount}|${r.isIncome}`;
+            if(!seen.has(k)){ merged.push(r); seen.add(k); }
+          }
+          MONTHS[mk].bankTransactions = merged;
+          MONTHS[mk].bankFileName = file.name;
+          bankAdded++; monthsAffected.add(mk);
+        }
+      }
+    }catch(err){
+      console.error(err);
+      errors.push(`${file.name}: ${err.message}`);
+    }
+  }
+  saveMonths(MONTHS);
+  const allMonths = Object.keys(MONTHS).sort((a,b)=>monthSortKey(b)-monthSortKey(a));
+  if(allMonths.length){
+    SELECTED_MONTH = allMonths[0];
+    document.getElementById("content").style.display = "block";
+    renderMonthSelector();
+    selectMonth(SELECTED_MONTH);
+  }
+  let msg = `✓ נטענו ${files.length} קבצים`;
+  if(monthsAffected.size) msg += ` · ${monthsAffected.size} חודשים`;
+  if(errors.length) msg += ` · ⚠️ ${errors.length} שגיאות`;
+  status.innerHTML = msg + (errors.length ? `<br><small style="color:#dc2626">${errors.join("<br>")}</small>` : "");
+}
+
+function normalizeBillingMonth(s){
+  const m = /(\d{1,2})\/(\d{2,4})/.exec(String(s));
+  if(!m) return null;
+  let year = m[2]; if(year.length===2) year = "20"+year;
+  return `${m[1].padStart(2,"0")}/${year}`;
+}
+
+function selectMonth(key){
+  SELECTED_MONTH = key;
+  const m = MONTHS[key];
+  if(!m){ return; }
+  if(m.creditTransactions){
+    CURRENT = analyze(m.creditTransactions);
+    CURRENT.billingMonth = key;
+    CURRENT.fileName = m.creditFileName || "";
+  } else {
+    CURRENT = null;
+  }
+  if(m.bankTransactions){
+    BANK = analyzeBank(m.bankTransactions);
+    BANK.fileName = m.bankFileName || "";
+  } else {
+    BANK = null;
+  }
+  renderMonthSelector();
+  if(CURRENT){
+    renderAll(CURRENT, prevMonthSnapshot());
+  } else if(BANK){
+    document.getElementById("kpis").innerHTML = "";
+    renderCashflow();
+    renderCatChart();
+    renderCatTable();
+    renderBankSection();
+    document.querySelector("#instTable tbody").innerHTML = `<tr><td colspan="5" class="empty">אין נתוני אשראי לחודש זה</td></tr>`;
+    document.querySelector("#hokTable tbody").innerHTML = `<tr><td colspan="3" class="empty">אין נתוני אשראי לחודש זה</td></tr>`;
+    document.getElementById("topMerchants").innerHTML = `<div class="empty">אין נתוני אשראי</div>`;
+    document.getElementById("insights").innerHTML = "";
+  }
+}
+
+function prevMonthSnapshot(){
+  const all = Object.keys(MONTHS).sort((a,b)=>monthSortKey(a)-monthSortKey(b));
+  const idx = all.indexOf(SELECTED_MONTH);
+  if(idx<=0) return null;
+  const prevKey = all[idx-1];
+  const prev = MONTHS[prevKey];
+  if(!prev || !prev.creditTransactions) return null;
+  const A = analyze(prev.creditTransactions);
+  return {label: monthLabel(prevKey), total: A.total, byCat: A.byCat};
+}
+
+function renderMonthSelector(){
+  const wrap = document.getElementById("monthSelectorWrap");
+  /* הסתר חודשים ללא אשראי — שאריות תנועות בנק 1-10 לחודש */
+  const all = Object.keys(MONTHS).filter(k=>!!MONTHS[k].creditTransactions).sort((a,b)=>monthSortKey(b)-monthSortKey(a));
+  if(!all.length){ wrap.style.display="none"; return; }
+  wrap.style.display="block";
+  document.getElementById("monthCount").innerText = `${all.length} חודשים בזיכרון`;
+  document.getElementById("monthSelector").innerHTML = all.map(k=>{
+    const m = MONTHS[k];
+    const hasBank = !!m.bankTransactions;
+    const hasCredit = !!m.creditTransactions;
+    const indicators = (hasCredit?"💳":"") + (hasBank?"🏦":"");
+    return `<button class="monthChip ${k===SELECTED_MONTH?"active":""}${hasBank?" has-bank":""}" data-month="${k}">
+      <span class="dot"></span>${monthLabel(k)} <span style="opacity:.7">${indicators}</span>
+    </button>`;
+  }).join("") + `<button class="monthChip" style="border-color:#fecaca;color:#dc2626" onclick="if(confirm('למחוק את כל החודשים מהזיכרון?')){MONTHS={};saveMonths(MONTHS);document.getElementById('content').style.display='none';document.getElementById('monthSelectorWrap').style.display='none';document.getElementById('uploadStatus').innerText='הדשבורד יזהה אוטומטית סוג כל קובץ ויחלק אותם לחודשים';}">🗑️ נקה הכל</button>`;
+  document.querySelectorAll(".monthChip[data-month]").forEach(b=>b.addEventListener("click", ()=>selectMonth(b.dataset.month)));
+}
+
+const dzAll = document.getElementById("dropZoneAll");
+const fiAll = document.getElementById("fileInputAll");
+dzAll.addEventListener("click", ()=>fiAll.click());
+fiAll.addEventListener("change", e=>handleFiles(Array.from(e.target.files)));
+["dragover","dragenter"].forEach(ev=>dzAll.addEventListener(ev, e=>{e.preventDefault();dzAll.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>dzAll.addEventListener(ev, e=>{e.preventDefault();dzAll.classList.remove("drag");}));
+dzAll.addEventListener("drop", e=>{ if(e.dataTransfer.files.length) handleFiles(Array.from(e.dataTransfer.files)); });
+
+window.addEventListener("DOMContentLoaded", ()=>{
+  const all = Object.keys(MONTHS).sort((a,b)=>monthSortKey(b)-monthSortKey(a));
+  if(all.length){
+    document.getElementById("content").style.display = "block";
+    SELECTED_MONTH = all[0];
+    renderMonthSelector();
+    selectMonth(SELECTED_MONTH);
+  }
+});
+
+document.getElementById("search").addEventListener("input", e=>{ if(CURRENT) renderTransactions(CURRENT, e.target.value); });
+
+document.getElementById("saveMonthBtn").addEventListener("click", ()=>{
+  if(!CURRENT) return;
+  const label = prompt("שם לחודש (לדוגמה: מאי 2026):", CURRENT.billingMonth || "");
+  if(!label) return;
+  HISTORY = HISTORY.filter(h=>h.label!==label);
+  HISTORY.push({label, total:CURRENT.total, count:CURRENT.count, byCat:CURRENT.byCat, income: BANK?BANK.incomeSum:null, savedAt: new Date().toISOString()});
+  HISTORY.sort((a,b)=>a.savedAt.localeCompare(b.savedAt));
+  saveHistory(HISTORY);
+  alert(`נשמר ✓  כעת תוכל להשוות בחודש הבא.`);
+  renderMonthCompare(CURRENT);
+});
+
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  if(!CURRENT) return;
+  const rows = [["תאריך","בית עסק","קטגוריה_מותאמת","קטגוריה_מקור","סכום","סוג","הערות"]];
+  CURRENT.transactions.forEach(t=>rows.push([t.date,t.merchant,CAT_BY_ID[t._cat]?.name||"",t.sourceCat,t.amount,t.type,t.notes]));
+  if(BANK){
+    rows.push([]); rows.push(["===","הכנסות מהבנק","","","","",""]);
+    BANK.income.forEach(r=>rows.push([r.date,r.description,"הכנסה","",r.amount,"זכות",""]));
+    rows.push([]); rows.push(["===","הוצאות מהבנק","","","","",""]);
+    BANK.expenses.forEach(r=>rows.push([r.date,r.description,"הוצאת בנק","",r.amount,"חובה",""]));
+  }
+  const csv = rows.map(r=>r.map(v=>`"${(v??"").toString().replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `hozaot_${CURRENT.billingMonth||"month"}.csv`; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("historyBtn").addEventListener("click", ()=>{
+  const list = document.getElementById("historyList");
+  if(!HISTORY.length){ list.innerHTML = `<div class="empty">אין חודשים שמורים עדיין.</div>`; }
+  else{
+    list.innerHTML = HISTORY.slice().reverse().map(h=>`
+      <div class="card" style="margin-bottom:10px">
+        <div class="row-flex"><b>${h.label}</b><span class="num" style="font-weight:700">${NIS(h.total)}</span></div>
+        <div class="muted">${h.count} עסקאות${h.income?` · הכנסה ${NIS(h.income)}`:""} · נשמר ${new Date(h.savedAt).toLocaleDateString("he-IL")}</div>
+        <div class="actions" style="margin-top:8px"><button class="ghost" onclick="if(confirm('למחוק את ${h.label}?')){HISTORY=HISTORY.filter(x=>x.label!=='${h.label}');saveHistory(HISTORY);document.getElementById('historyBtn').click();}">מחק</button></div>
+      </div>`).join("");
+  }
+  document.getElementById("historyModal").style.display = "flex";
+});
+
+document.getElementById("settingsBtn").addEventListener("click", ()=>{
+  document.getElementById("setCutoffDay").value = CYCLE.cutoffDay || 10;
+  const cm = document.getElementById("customMappings");
+  const entries = Object.entries(CUSTOM_MAP);
+  if(!entries.length) cm.innerHTML = `<div class="empty">לא נשמרו עדיין מיפויים.</div>`;
+  else cm.innerHTML = `<table><thead><tr><th>בית עסק</th><th>קטגוריה</th><th></th></tr></thead><tbody>${entries.map(([m,c])=>`<tr><td>${m}</td><td>${CAT_BY_ID[c]?.icon||""} ${CAT_BY_ID[c]?.name||c}</td><td><button class="ghost" onclick="delete CUSTOM_MAP['${m.replace(/'/g,"\\'")}'];saveMapping(CUSTOM_MAP);document.getElementById('settingsBtn').click();">×</button></td></tr>`).join("")}</tbody></table>`;
+  document.getElementById("settingsModal").style.display = "flex";
+});
+
+document.getElementById("saveCycleBtn").addEventListener("click", ()=>{
+  const v = parseInt(document.getElementById("setCutoffDay").value, 10);
+  if(isNaN(v) || v<1 || v>28){ alert("יום חתך חייב להיות בין 1 ל-28"); return; }
+  CYCLE.cutoffDay = v;
+  saveCycleSettings(CYCLE);
+  alert("נשמר ✓\nכדי לראות את ההשפעה: 1) לחץ 🗑️ נקה הכל ליד בוחר החודשים  2) גרור מחדש את הקבצים שלך.");
+  document.getElementById("settingsModal").style.display = "none";
+});
+
+document.getElementById("clearMappingsBtn").addEventListener("click", ()=>{
+  if(confirm("למחוק את כל המיפויים שלמדתי?")){ CUSTOM_MAP={}; saveMapping(CUSTOM_MAP); document.getElementById("settingsBtn").click(); if(CURRENT){const A=analyze(CURRENT.transactions);CURRENT=A;renderAll(A, HISTORY.length?HISTORY[HISTORY.length-1]:null);} }
+});
+document.getElementById("clearAllBtn").addEventListener("click", ()=>{
+  if(confirm("למחוק הכל כולל היסטוריה?")){ CUSTOM_MAP={};HISTORY=[];saveMapping(CUSTOM_MAP);saveHistory(HISTORY);document.getElementById("settingsBtn").click(); }
+});
+
+document.querySelectorAll(".tabBar button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabBar button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    document.querySelectorAll(".tabPanel").forEach(p=>p.classList.remove("active"));
+    document.getElementById("tab-"+tab).classList.add("active");
+    if(tab==="invest"){ renderInvest(); document.getElementById("content").style.display="block"; }
+    if(tab==="breakdown"){ renderBreakdown(); document.getElementById("content").style.display="block"; }
+  });
+});
+
+/* ============================================================
+   ניהול השקעות
+   ============================================================ */
+const INVEST_KEY = "hozaot_investments_v1";
+const COMP_COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899","#3b82f6","#84cc16","#a855f7","#14b8a6","#f97316"];
+let INVESTMENTS = loadInvest();
+function loadInvest(){ try{ return JSON.parse(localStorage.getItem(INVEST_KEY)||'{"components":[],"data":{}}'); } catch(e){ return {components:[],data:{}}; } }
+function saveInvest(){ try{ localStorage.setItem(INVEST_KEY, JSON.stringify(INVESTMENTS)); } catch(e){ alert("אין מקום בדפדפן — נסה למחוק חודשים ישנים."); } }
+
+function uid(){ return "c_"+Math.random().toString(36).slice(2,9); }
+
+function sortedMonths(){
+  return Object.keys(INVESTMENTS.data).sort((a,b)=>monthSortKey(a)-monthSortKey(b));
+}
+function monthsAscending(){ return sortedMonths(); }
+function monthsDescending(){ return sortedMonths().slice().reverse(); }
+
+function monthlyReturnsByComponent(){
+  const months = monthsAscending();
+  const out = {};
+  INVESTMENTS.components.forEach(c => out[c.id] = {});
+  for(let i=0;i<months.length;i++){
+    const mPrev = months[i-1];
+    const mCur = months[i];
+    for(const c of INVESTMENTS.components){
+      const cur = INVESTMENTS.data[mCur]?.[c.id];
+      const prev = mPrev ? INVESTMENTS.data[mPrev]?.[c.id] : null;
+      if(!cur || !prev) { out[c.id][mCur] = null; continue; }
+      const prevBal = +prev.balance || 0;
+      const curBal = +cur.balance || 0;
+      const deposit = +cur.deposit || 0;
+      if(prevBal===0){ out[c.id][mCur] = null; continue; }
+      out[c.id][mCur] = (curBal - prevBal - deposit) / prevBal;
+    }
+  }
+  return out;
+}
+
+function ytdReturn(compId, returnsMap){
+  const months = monthsAscending();
+  if(!months.length) return null;
+  const lastMonth = months[months.length-1];
+  const year = lastMonth.split("/")[1];
+  let cumul = 1;
+  let hasAny = false;
+  for(const m of months){
+    if(m.split("/")[1] !== year) continue;
+    const r = returnsMap[compId]?.[m];
+    if(r==null) continue;
+    cumul *= (1+r);
+    hasAny = true;
+  }
+  return hasAny ? cumul - 1 : null;
+}
+
+function totalReturn(compId, returnsMap){
+  let cumul = 1, hasAny = false;
+  for(const m of monthsAscending()){
+    const r = returnsMap[compId]?.[m];
+    if(r==null) continue;
+    cumul *= (1+r);
+    hasAny = true;
+  }
+  return hasAny ? cumul - 1 : null;
+}
+
+function compTotalDeposits(compId){
+  return monthsAscending().reduce((s,m)=> s + (+INVESTMENTS.data[m]?.[compId]?.deposit || 0), 0);
+}
+function compLatestBalance(compId){
+  for(const m of monthsDescending()){
+    const v = INVESTMENTS.data[m]?.[compId]?.balance;
+    if(v!=null) return {month:m, balance:+v};
+  }
+  return null;
+}
+function compPrevBalance(compId, month){
+  const months = monthsAscending();
+  const idx = months.indexOf(month);
+  if(idx<=0) return null;
+  for(let i=idx-1;i>=0;i--){
+    const v = INVESTMENTS.data[months[i]]?.[compId]?.balance;
+    if(v!=null) return {month:months[i], balance:+v};
+  }
+  return null;
+}
+
+function totalByMonth(){
+  return monthsAscending().map(m=>{
+    let total = 0;
+    const perComp = {};
+    for(const c of INVESTMENTS.components){
+      const b = +INVESTMENTS.data[m]?.[c.id]?.balance || 0;
+      perComp[c.id] = b;
+      total += b;
+    }
+    return {month:m, total, perComp};
+  });
+}
+
+function renderInvest(){
+  const empty = document.getElementById("investEmpty");
+  const main = document.getElementById("investMain");
+  if(!INVESTMENTS.components.length){
+    empty.style.display = "block";
+    main.style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+  main.style.display = "block";
+  renderInvestKpis();
+  renderInvestChart();
+  renderInvestComponentCards();
+  renderInvestTable();
+}
+
+function renderInvestKpis(){
+  const months = monthsAscending();
+  const ret = monthlyReturnsByComponent();
+  const latestMonth = months[months.length-1];
+  if(!latestMonth){
+    document.getElementById("investKpis").innerHTML = `<div class="card kpi"><div class="label">אין עדיין נתוני חודשים</div><div class="value">—</div><div class="delta">לחץ "➕ הוסף נתוני חודש" כדי להתחיל</div></div>`;
+    return;
+  }
+  const totals = totalByMonth();
+  const last = totals[totals.length-1];
+  const prev = totals[totals.length-2];
+  const totalNow = last.total;
+  const totalPrev = prev ? prev.total : null;
+  const monthDelta = totalPrev!=null ? totalNow - totalPrev : null;
+  const compIds = INVESTMENTS.components.map(c=>c.id);
+  function portfolioTWR(yearOnly){
+    const yr = latestMonth.split("/")[1];
+    let cumul = 1, has = false;
+    for(let i=1;i<months.length;i++){
+      if(yearOnly && months[i].split("/")[1]!==yr) continue;
+      const mPrev = months[i-1], mCur = months[i];
+      let prevTotal = 0, curTotal = 0, deposits = 0;
+      for(const id of compIds){
+        prevTotal += +INVESTMENTS.data[mPrev]?.[id]?.balance || 0;
+        curTotal  += +INVESTMENTS.data[mCur]?.[id]?.balance || 0;
+        deposits  += +INVESTMENTS.data[mCur]?.[id]?.deposit || 0;
+      }
+      if(prevTotal===0) continue;
+      const r = (curTotal - prevTotal - deposits) / prevTotal;
+      cumul *= (1+r); has = true;
+    }
+    return has ? cumul - 1 : null;
+  }
+  const ytdRet = portfolioTWR(true);
+  const totalRet = portfolioTWR(false);
+  const yr = latestMonth.split("/")[1];
+  let depositsYTD = 0, depositsTotal = 0;
+  for(const m of months){
+    const isYear = m.split("/")[1]===yr;
+    for(const id of compIds){
+      const d = +INVESTMENTS.data[m]?.[id]?.deposit || 0;
+      depositsTotal += d;
+      if(isYear) depositsYTD += d;
+    }
+  }
+  const items = [
+    {label:"💼 שווי תיק כולל", value:NIS(totalNow), note:`נכון ל-${monthLabel(latestMonth)}`, cls:"purple"},
+    {label: monthDelta>=0?"📈 שינוי מחודש קודם":"📉 שינוי מחודש קודם",
+      value: monthDelta!=null ? (monthDelta>=0?"+":"")+NIS(monthDelta) : "—",
+      note: monthDelta!=null && totalPrev ? `${(monthDelta/totalPrev*100).toFixed(2)}%` : "אין נתון קודם",
+      cls: monthDelta!=null && monthDelta>=0 ? "green":"amber"},
+    {label:`📊 תשואה ${yr} (YTD)`,
+      value: ytdRet!=null ? ((ytdRet>=0?"+":"")+(ytdRet*100).toFixed(2)+"%") : "—",
+      note: totalRet!=null ? `מצטברת מההתחלה: ${(totalRet>=0?"+":"")+(totalRet*100).toFixed(2)}%` : "",
+      cls: ytdRet!=null && ytdRet>=0 ? "green":"amber"},
+    {label:"💰 סך הפקדות", value:NIS(depositsTotal), note:`מהן ${NIS(depositsYTD)} ב-${yr}`, cls:"cyan"},
+  ];
+  document.getElementById("investKpis").innerHTML = items.map(it=>`
+    <div class="card kpi ${it.cls}"><div class="accent"></div>
+      <div class="label">${it.label}</div>
+      <div class="value">${it.value}</div>
+      ${it.note?`<div class="delta">${it.note}</div>`:""}
+    </div>`).join("");
+}
+
+function renderInvestChart(){
+  const totals = totalByMonth();
+  const labels = totals.map(t=>monthLabel(t.month));
+  if(charts.invest) charts.invest.destroy();
+  const datasets = INVESTMENTS.components.map((c,idx)=>({
+    label: c.name,
+    data: totals.map(t=>t.perComp[c.id] || 0),
+    backgroundColor: (c.color||COMP_COLORS[idx%COMP_COLORS.length])+"33",
+    borderColor: c.color||COMP_COLORS[idx%COMP_COLORS.length],
+    borderWidth: 2,
+    fill: true,
+    tension: .25
+  }));
+  charts.invest = new Chart(document.getElementById("investChart"), {
+    type:"line",
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",rtl:true,labels:{font:{family:"Heebo",size:12},boxWidth:14,padding:10}}, tooltip:{rtl:true, callbacks:{label:ctx=>` ${ctx.dataset.label}: ${NIS(ctx.parsed.y)}`}}},
+      scales:{y:{stacked:true, ticks:{callback:v=>NIS(v)}}, x:{}},
+    }
+  });
+  document.getElementById("investChartNote").innerText = `${totals.length} חודשים · ${INVESTMENTS.components.length} רכיבים`;
+}
+
+function renderInvestComponentCards(){
+  const wrap = document.getElementById("investComponentCards");
+  const ret = monthlyReturnsByComponent();
+  wrap.innerHTML = INVESTMENTS.components.map((c,idx)=>{
+    const color = c.color || COMP_COLORS[idx%COMP_COLORS.length];
+    const latest = compLatestBalance(c.id);
+    const prev = latest ? compPrevBalance(c.id, latest.month) : null;
+    const monthDelta = (latest && prev) ? (latest.balance - prev.balance) : null;
+    const monthDepositCur = latest ? (+INVESTMENTS.data[latest.month]?.[c.id]?.deposit || 0) : 0;
+    const monthReturn = (latest && prev && prev.balance) ? (latest.balance - prev.balance - monthDepositCur)/prev.balance : null;
+    const ytd = ytdReturn(c.id, ret);
+    const totalRet = totalReturn(c.id, ret);
+    const totalDep = compTotalDeposits(c.id);
+    return `<div class="card" style="border-top:3px solid ${color}">
+      <div class="row-flex"><h3 style="margin:0">${c.name}</h3><span class="muted">${latest?monthLabel(latest.month):"—"}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:13px">
+        <div><div class="muted">שווי נוכחי</div><div style="font-size:20px;font-weight:800">${latest?NIS(latest.balance):"—"}</div></div>
+        <div><div class="muted">שינוי מחודש קודם</div><div style="font-size:18px;font-weight:700;color:${monthDelta==null?'#6b7280':(monthDelta>=0?'#10b981':'#ef4444')}">${monthDelta==null?"—":((monthDelta>=0?"+":"")+NIS(monthDelta))}</div>${monthReturn!=null?`<div class="muted" style="font-size:12px">תשואה חודשית: ${(monthReturn*100).toFixed(2)}%</div>`:""}</div>
+        <div><div class="muted">תשואה YTD</div><div style="font-size:18px;font-weight:700;color:${ytd==null?'#6b7280':(ytd>=0?'#10b981':'#ef4444')}">${ytd==null?"—":((ytd>=0?"+":"")+(ytd*100).toFixed(2)+"%")}</div>${totalRet!=null?`<div class="muted" style="font-size:12px">מאז התחלה: ${(totalRet>=0?"+":"")+(totalRet*100).toFixed(2)}%</div>`:""}</div>
+        <div><div class="muted">סך הפקדות</div><div style="font-size:18px;font-weight:700">${NIS(totalDep)}</div></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderInvestTable(){
+  const ret = monthlyReturnsByComponent();
+  const months = monthsDescending();
+  const compIds = INVESTMENTS.components.map(c=>c.id);
+  const table = document.getElementById("investTable");
+  const thead = `<tr><th>חודש</th>${INVESTMENTS.components.map(c=>`<th>${c.name}<br><span class="muted" style="font-size:10px;font-weight:400">שווי · הפקדה · תשואה</span></th>`).join("")}<th>סה"כ</th></tr>`;
+  table.querySelector("thead").innerHTML = thead;
+  if(!months.length){
+    table.querySelector("tbody").innerHTML = `<tr><td colspan="${compIds.length+2}" class="empty">אין נתונים. לחץ "➕ הוסף נתוני חודש".</td></tr>`;
+    return;
+  }
+  table.querySelector("tbody").innerHTML = months.map(m=>{
+    let total = 0;
+    const cells = INVESTMENTS.components.map(c=>{
+      const d = INVESTMENTS.data[m]?.[c.id];
+      const bal = +d?.balance || 0;
+      const dep = +d?.deposit || 0;
+      const r = ret[c.id]?.[m];
+      total += bal;
+      if(!d) return `<td class="muted" style="font-size:12px">—</td>`;
+      const rStr = r!=null ? `<span style="color:${r>=0?'#10b981':'#ef4444'};font-size:11px">${(r>=0?"+":"")+(r*100).toFixed(2)}%</span>` : "";
+      const depStr = dep ? `<span class="muted" style="font-size:11px">+${NIS(dep)} הפקדה</span>` : "";
+      return `<td class="num"><div style="font-weight:700">${NIS(bal)}</div><div>${depStr}</div><div>${rStr}</div></td>`;
+    }).join("");
+    return `<tr style="cursor:pointer" onclick="openEditMonth('${m}')"><td><b>${monthLabel(m)}</b></td>${cells}<td class="num" style="font-weight:800">${NIS(total)}</td></tr>`;
+  }).join("");
+}
+
+function openComponents(){
+  renderComponentsList();
+  document.getElementById("componentsModal").style.display = "flex";
+}
+function renderComponentsList(){
+  const list = document.getElementById("componentsList");
+  if(!INVESTMENTS.components.length){ list.innerHTML = `<div class="empty">אין רכיבים עדיין.</div>`; return; }
+  list.innerHTML = INVESTMENTS.components.map((c,idx)=>{
+    const color = c.color || COMP_COLORS[idx%COMP_COLORS.length];
+    return `<div class="row-flex" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:12px;height:12px;border-radius:99px;background:${color}"></span><b>${c.name}</b></div>
+      <div style="display:flex;gap:6px">
+        <button class="ghost" onclick="renameComponent('${c.id}')">✏️</button>
+        <button class="ghost" style="background:var(--bad);color:white" onclick="removeComponent('${c.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function addComponent(){
+  const input = document.getElementById("newComponentName");
+  const name = input.value.trim();
+  if(!name) return;
+  INVESTMENTS.components.push({id:uid(), name, color: COMP_COLORS[INVESTMENTS.components.length % COMP_COLORS.length]});
+  saveInvest();
+  input.value = "";
+  renderComponentsList();
+  renderInvest();
+}
+function renameComponent(id){
+  const c = INVESTMENTS.components.find(x=>x.id===id);
+  if(!c) return;
+  const newName = prompt("שם חדש:", c.name);
+  if(!newName) return;
+  c.name = newName.trim();
+  saveInvest();
+  renderComponentsList();
+  renderInvest();
+}
+function removeComponent(id){
+  if(!confirm("למחוק את הרכיב? כל הנתונים שלו ימחקו גם.")) return;
+  INVESTMENTS.components = INVESTMENTS.components.filter(c=>c.id!==id);
+  for(const m of Object.keys(INVESTMENTS.data)){ delete INVESTMENTS.data[m]?.[id]; }
+  saveInvest();
+  renderComponentsList();
+  renderInvest();
+}
+window.renameComponent = renameComponent;
+window.removeComponent = removeComponent;
+
+function openAddMonth(monthToEdit){
+  const modal = document.getElementById("addMonthModal");
+  const monthInput = document.getElementById("monthInput");
+  const title = document.getElementById("addMonthTitle");
+  const delBtn = document.getElementById("deleteMonthBtn");
+  if(monthToEdit){
+    const [mm, yy] = monthToEdit.split("/");
+    monthInput.value = `${yy}-${mm}`;
+    title.innerText = `✏️ עריכת ${monthLabel(monthToEdit)}`;
+    delBtn.style.display = "inline-block";
+    delBtn.dataset.month = monthToEdit;
+  } else {
+    const months = monthsAscending();
+    if(months.length){
+      const last = months[months.length-1];
+      const [m,y] = last.split("/");
+      let nm = +m+1, ny = +y;
+      if(nm>12){ nm=1; ny++; }
+      monthInput.value = `${ny}-${String(nm).padStart(2,"0")}`;
+    } else {
+      const now = new Date();
+      monthInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    }
+    title.innerText = `➕ הוסף נתוני חודש`;
+    delBtn.style.display = "none";
+  }
+  renderComponentInputs(monthToEdit);
+  modal.style.display = "flex";
+}
+function renderComponentInputs(monthKey){
+  const data = monthKey ? INVESTMENTS.data[monthKey] : null;
+  document.getElementById("componentInputs").innerHTML = INVESTMENTS.components.map((c,idx)=>{
+    const color = c.color || COMP_COLORS[idx%COMP_COLORS.length];
+    const d = data?.[c.id] || {};
+    return `<div class="card" style="margin-bottom:8px;padding:12px;border-right:4px solid ${color}">
+      <h3 style="margin:0 0 8px">${c.name}</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:13px">שווי סוף-חודש (₪)
+          <input type="number" data-comp="${c.id}" data-field="balance" value="${d.balance!=null?d.balance:""}" style="display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;font-family:inherit"/>
+        </label>
+        <label style="font-size:13px">הפקדה החודש (₪)
+          <input type="number" data-comp="${c.id}" data-field="deposit" value="${d.deposit!=null?d.deposit:""}" style="display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;font-family:inherit"/>
+        </label>
+      </div>
+    </div>`;
+  }).join("");
+}
+function saveMonthData(){
+  const v = document.getElementById("monthInput").value;
+  if(!v){ alert("בחר חודש"); return; }
+  const [yy,mm] = v.split("-");
+  const key = `${mm}/${yy}`;
+  const data = INVESTMENTS.data[key] || {};
+  document.querySelectorAll("#componentInputs input").forEach(inp=>{
+    const cid = inp.dataset.comp;
+    const field = inp.dataset.field;
+    const num = parseFloat(inp.value);
+    if(!data[cid]) data[cid] = {};
+    if(!isNaN(num)) data[cid][field] = num;
+    else delete data[cid][field];
+    if(Object.keys(data[cid]).length===0) delete data[cid];
+  });
+  if(Object.keys(data).length===0){ delete INVESTMENTS.data[key]; }
+  else INVESTMENTS.data[key] = data;
+  saveInvest();
+  document.getElementById("addMonthModal").style.display = "none";
+  renderInvest();
+}
+function openEditMonth(month){ openAddMonth(month); }
+window.openEditMonth = openEditMonth;
+
+document.getElementById("investSetupBtn").addEventListener("click", openComponents);
+document.getElementById("manageComponentsBtn").addEventListener("click", openComponents);
+document.getElementById("addComponentBtn").addEventListener("click", addComponent);
+document.getElementById("newComponentName").addEventListener("keydown", e=>{ if(e.key==="Enter") addComponent(); });
+document.getElementById("addInvestMonthBtn").addEventListener("click", ()=>openAddMonth(null));
+document.getElementById("saveMonthDataBtn").addEventListener("click", saveMonthData);
+document.getElementById("deleteMonthBtn").addEventListener("click", ()=>{
+  const m = document.getElementById("deleteMonthBtn").dataset.month;
+  if(!m) return;
+  if(!confirm(`למחוק את כל נתוני ${monthLabel(m)}?`)) return;
+  delete INVESTMENTS.data[m];
+  saveInvest();
+  document.getElementById("addMonthModal").style.display = "none";
+  renderInvest();
+});
+
+document.getElementById("exportInvestBtn").addEventListener("click", ()=>{
+  const months = monthsAscending();
+  const ret = monthlyReturnsByComponent();
+  const rows = [["חודש", ...INVESTMENTS.components.flatMap(c=>[`${c.name} - שווי`,`${c.name} - הפקדה`,`${c.name} - תשואה %`]), "סה\"כ"]];
+  for(const m of months){
+    let total = 0;
+    const cells = INVESTMENTS.components.flatMap(c=>{
+      const d = INVESTMENTS.data[m]?.[c.id] || {};
+      total += +d.balance || 0;
+      const r = ret[c.id]?.[m];
+      return [d.balance||"", d.deposit||"", r!=null?(r*100).toFixed(2):""];
+    });
+    rows.push([monthLabel(m), ...cells, total]);
+  }
+  const csv = rows.map(r=>r.map(v=>`"${(v??"").toString().replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = "investments.csv"; a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ============================================================
+   גיבוי ושחזור
+   ============================================================ */
+document.getElementById("exportBackupBtn").addEventListener("click", ()=>{
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    months:      JSON.parse(localStorage.getItem(MONTHS_KEY)||"{}"),
+    history:     JSON.parse(localStorage.getItem(STORAGE_KEYS.history)||"[]"),
+    mapping:     JSON.parse(localStorage.getItem(STORAGE_KEYS.mapping)||"{}"),
+    investments: JSON.parse(localStorage.getItem(INVEST_KEY)||"{}"),
+    cycle:       JSON.parse(localStorage.getItem(CYCLE_SETTINGS_KEY)||"{}"),
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `dashboard_backup_${date}.json`; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("importBackupInput").addEventListener("change", async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if(!backup.version) throw new Error("קובץ לא תקין");
+    if(!confirm(`שחזר גיבוי מ-${backup.exportedAt?.slice(0,10)||"?"}?\nזה יחליף את כל הנתונים הנוכחיים.`)) return;
+    if(backup.months)      localStorage.setItem(MONTHS_KEY, JSON.stringify(backup.months));
+    if(backup.history)     localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(backup.history));
+    if(backup.mapping)     localStorage.setItem(STORAGE_KEYS.mapping, JSON.stringify(backup.mapping));
+    if(backup.investments) localStorage.setItem(INVEST_KEY, JSON.stringify(backup.investments));
+    if(backup.cycle)       localStorage.setItem(CYCLE_SETTINGS_KEY, JSON.stringify(backup.cycle));
+    alert("שוחזר בהצלחה ✓ הדף יטען מחדש.");
+    location.reload();
+  } catch(err){
+    alert("שגיאה בייבוא: " + err.message);
+  }
+  e.target.value = "";
+});
+</script>
+</body>
+</html>
