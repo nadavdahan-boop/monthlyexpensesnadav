@@ -6,6 +6,7 @@
 <title>דשבורד הוצאות חודשי</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg-1:#f5f3ff; --bg-2:#eef2ff; --card:#ffffff;
@@ -101,6 +102,18 @@
 </style>
 </head>
 <body>
+<div id="authOverlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#f5f3ff,#eef2ff);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="max-width:360px;width:100%;padding:28px" dir="rtl">
+    <h2 style="text-align:center;margin-bottom:4px">📊 דשבורד הוצאות</h2>
+    <div class="sub" style="text-align:center;margin-bottom:20px">התחבר כדי לגשת לנתונים שלך מכל מכשיר</div>
+    <div id="authError" style="color:#ef4444;font-size:13px;margin-bottom:10px;display:none;text-align:center"></div>
+    <input id="authEmail" type="email" placeholder="אימייל" autocomplete="username" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px"/>
+    <input id="authPassword" type="password" placeholder="סיסמה" autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:14px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px"/>
+    <button id="authLoginBtn" style="width:100%;padding:10px;margin-bottom:8px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">התחבר</button>
+    <button id="authSignupBtn" style="width:100%;padding:10px;background:none;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;font-size:14px">אין לי חשבון — הרשמה</button>
+    <div id="authLoading" style="text-align:center;margin-top:14px;display:none;color:#6b7280;font-size:13px">⏳ טוען...</div>
+  </div>
+</div>
 <div class="wrap">
   <header style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px">
     <div>
@@ -110,6 +123,7 @@
     <div class="actions">
       <button class="ghost" id="historyBtn">📅 היסטוריה</button>
       <button class="ghost" id="settingsBtn">⚙️ הגדרות</button>
+      <button class="ghost" id="logoutBtn" style="display:none">🚪 התנתק</button>
     </div>
   </header>
 
@@ -279,7 +293,7 @@
   <div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
     <div class="card" style="max-width:560px;width:100%;max-height:80vh;overflow:auto">
       <div class="row-flex"><h2>⚙️ הגדרות וזיכרון</h2><button class="ghost" onclick="document.getElementById('settingsModal').style.display='none'">סגור</button></div>
-      <p class="muted">הדשבורד שומר היסטוריה ומיפוי בית-עסק→קטגוריה רק בדפדפן (localStorage). שום נתון לא עובר לשרת.</p>
+      <p class="muted">הדשבורד שומר היסטוריה ומיפוי בית-עסק→קטגוריה בדפדפן (localStorage), ומסנכרן אותם לחשבון שלך כדי שיהיו זמינים מכל מכשיר שאתה מתחבר בו.</p>
 
       <h3>📅 מחזור החשבון</h3>
       <p class="muted" style="margin:0 0 10px;font-size:13px">תאריך החתך קובע איך נחלקים החודשים. <b>אשראי</b>: חיוב ב-X לחודש = הוצאות מ-X לחודש הקודם עד X-1 לחודש החיוב. <b>בנק</b>: תנועות לפני יום X נכנסות לחודש הקודם.</p>
@@ -306,6 +320,130 @@
     </div>
   </div>
 </div>
+
+<script>
+(function(){
+  const SUPABASE_URL = "https://qgoxicqwcywunyqcinst.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnb3hpY3F3Y3l3dW55cWNpbnN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2MzM0NDIsImV4cCI6MjEwMDIwOTQ0Mn0.g2N9j9wwjtKPSd4m9uHnel-yZTq4w6ahNotOiaPIwLY";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const K_MONTHS = "hozaot_months_v1";
+  const K_HISTORY = "hozaot_history_v1";
+  const K_MAPPING = "hozaot_mapping_v1";
+  const K_INVEST = "hozaot_investments_v1";
+  const K_CYCLE = "hozaot_cycle_settings_v1";
+  const SESSION_RELOAD_FLAG = "__cloud_synced_once";
+
+  function el(id){ return document.getElementById(id); }
+
+  function localBackup(){
+    return {
+      months:      JSON.parse(localStorage.getItem(K_MONTHS)||"{}"),
+      history:     JSON.parse(localStorage.getItem(K_HISTORY)||"[]"),
+      mapping:     JSON.parse(localStorage.getItem(K_MAPPING)||"{}"),
+      investments: JSON.parse(localStorage.getItem(K_INVEST)||"{}"),
+      cycle:       JSON.parse(localStorage.getItem(K_CYCLE)||"{}"),
+    };
+  }
+  function applyBackupToLocalStorage(b){
+    if(b.months)      localStorage.setItem(K_MONTHS, JSON.stringify(b.months));
+    if(b.history)     localStorage.setItem(K_HISTORY, JSON.stringify(b.history));
+    if(b.mapping)     localStorage.setItem(K_MAPPING, JSON.stringify(b.mapping));
+    if(b.investments) localStorage.setItem(K_INVEST, JSON.stringify(b.investments));
+    if(b.cycle)       localStorage.setItem(K_CYCLE, JSON.stringify(b.cycle));
+  }
+
+  let syncTimer = null;
+  function scheduleCloudSync(){
+    if(!window.__authedUserId) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushToCloud, 1200);
+  }
+  async function pushToCloud(){
+    if(!window.__authedUserId) return;
+    try{
+      await sb.from("app_data").upsert({
+        id: "household",
+        data: localBackup(),
+        updated_at: new Date().toISOString(),
+      });
+    }catch(e){ console.error("cloud sync failed", e); }
+  }
+  window.__scheduleCloudSync = scheduleCloudSync;
+  window.__pushToCloud = pushToCloud;
+
+  async function pullFromCloudAndBoot(userId){
+    window.__authedUserId = userId;
+    let cloudRow = null;
+    try{
+      const { data, error } = await sb.from("app_data").select("data").eq("id", "household").maybeSingle();
+      if(error) throw error;
+      cloudRow = data;
+    }catch(e){ console.error("cloud fetch failed", e); }
+
+    if(cloudRow && cloudRow.data && Object.keys(cloudRow.data).length){
+      applyBackupToLocalStorage(cloudRow.data);
+    } else {
+      await pushToCloud();
+    }
+    el("authOverlay").style.display = "none";
+    el("logoutBtn").style.display = "";
+    if(!sessionStorage.getItem(SESSION_RELOAD_FLAG)){
+      sessionStorage.setItem(SESSION_RELOAD_FLAG, "1");
+      location.reload();
+    }
+  }
+
+  function showAuthError(msg){ const b = el("authError"); b.textContent = msg; b.style.display = "block"; }
+  function clearAuthError(){ el("authError").style.display = "none"; }
+  function setAuthLoading(v){
+    el("authLoading").style.display = v ? "block" : "none";
+    el("authLoginBtn").disabled = v;
+    el("authSignupBtn").disabled = v;
+  }
+
+  window.addEventListener("DOMContentLoaded", async ()=>{
+    el("authLoginBtn").addEventListener("click", async ()=>{
+      clearAuthError();
+      const email = el("authEmail").value.trim(), password = el("authPassword").value;
+      if(!email || !password){ showAuthError("נא להזין אימייל וסיסמה"); return; }
+      setAuthLoading(true);
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      setAuthLoading(false);
+      if(error){ showAuthError(error.message); return; }
+      pullFromCloudAndBoot(data.user.id);
+    });
+
+    el("authSignupBtn").addEventListener("click", async ()=>{
+      clearAuthError();
+      const email = el("authEmail").value.trim(), password = el("authPassword").value;
+      if(!email || !password){ showAuthError("נא להזין אימייל וסיסמה"); return; }
+      if(password.length < 6){ showAuthError("הסיסמה חייבת להיות באורך 6 תווים לפחות"); return; }
+      setAuthLoading(true);
+      const { data, error } = await sb.auth.signUp({ email, password });
+      setAuthLoading(false);
+      if(error){ showAuthError(error.message); return; }
+      if(data.session){
+        pullFromCloudAndBoot(data.user.id);
+      } else {
+        showAuthError("נרשמת! אם נדרש אישור מייל — אשר ואז התחבר.");
+      }
+    });
+
+    el("logoutBtn").addEventListener("click", async ()=>{
+      await sb.auth.signOut();
+      sessionStorage.removeItem(SESSION_RELOAD_FLAG);
+      window.__authedUserId = null;
+      location.reload();
+    });
+
+    const { data: { session } } = await sb.auth.getSession();
+    if(session){
+      pullFromCloudAndBoot(session.user.id);
+    }
+  });
+})();
+</script>
 
 <script>
 const CATEGORIES = [
@@ -371,9 +509,9 @@ function categorize(merchant, sourceCat, customMap){
 
 const STORAGE_KEYS = {history:"hozaot_history_v1", mapping:"hozaot_mapping_v1"};
 const loadMapping = ()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.mapping)||"{}"); } catch(e){ return {}; } };
-const saveMapping = m => localStorage.setItem(STORAGE_KEYS.mapping, JSON.stringify(m));
+const saveMapping = m => { localStorage.setItem(STORAGE_KEYS.mapping, JSON.stringify(m)); window.__scheduleCloudSync && window.__scheduleCloudSync(); };
 const loadHistory = ()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.history)||"[]"); } catch(e){ return []; } };
-const saveHistory = h => localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(h));
+const saveHistory = h => { localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(h)); window.__scheduleCloudSync && window.__scheduleCloudSync(); };
 
 let CUSTOM_MAP = loadMapping();
 let HISTORY = loadHistory();
@@ -383,7 +521,7 @@ let charts = {};
 
 const MONTHS_KEY = "hozaot_months_v1";
 const loadMonths = ()=>{ try{ return JSON.parse(localStorage.getItem(MONTHS_KEY)||"{}"); } catch(e){ return {}; } };
-const saveMonths = m => { try{ localStorage.setItem(MONTHS_KEY, JSON.stringify(m)); } catch(e){ alert("⚠️ אזל מקום בדפדפן — נסה למחוק חודשים ישנים."); } };
+const saveMonths = m => { try{ localStorage.setItem(MONTHS_KEY, JSON.stringify(m)); window.__scheduleCloudSync && window.__scheduleCloudSync(); } catch(e){ alert("⚠️ אזל מקום בדפדפן — נסה למחוק חודשים ישנים."); } };
 let MONTHS = loadMonths();
 let SELECTED_MONTH = null;
 
@@ -406,7 +544,7 @@ function loadCycleSettings(){
   try{ return Object.assign({cutoffDay:10}, JSON.parse(localStorage.getItem(CYCLE_SETTINGS_KEY)||"{}")); }
   catch(e){ return {cutoffDay:10}; }
 }
-function saveCycleSettings(s){ localStorage.setItem(CYCLE_SETTINGS_KEY, JSON.stringify(s)); }
+function saveCycleSettings(s){ localStorage.setItem(CYCLE_SETTINGS_KEY, JSON.stringify(s)); window.__scheduleCloudSync && window.__scheduleCloudSync(); }
 let CYCLE = loadCycleSettings();
 
 function parseSimpleDate(s){
@@ -1538,7 +1676,7 @@ const INVEST_KEY = "hozaot_investments_v1";
 const COMP_COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444","#ec4899","#3b82f6","#84cc16","#a855f7","#14b8a6","#f97316"];
 let INVESTMENTS = loadInvest();
 function loadInvest(){ try{ return JSON.parse(localStorage.getItem(INVEST_KEY)||'{"components":[],"data":{}}'); } catch(e){ return {components:[],data:{}}; } }
-function saveInvest(){ try{ localStorage.setItem(INVEST_KEY, JSON.stringify(INVESTMENTS)); } catch(e){ alert("אין מקום בדפדפן — נסה למחוק חודשים ישנים."); } }
+function saveInvest(){ try{ localStorage.setItem(INVEST_KEY, JSON.stringify(INVESTMENTS)); window.__scheduleCloudSync && window.__scheduleCloudSync(); } catch(e){ alert("אין מקום בדפדפן — נסה למחוק חודשים ישנים."); } }
 
 function uid(){ return "c_"+Math.random().toString(36).slice(2,9); }
 
@@ -1981,6 +2119,7 @@ document.getElementById("importBackupInput").addEventListener("change", async e=
     if(backup.mapping)     localStorage.setItem(STORAGE_KEYS.mapping, JSON.stringify(backup.mapping));
     if(backup.investments) localStorage.setItem(INVEST_KEY, JSON.stringify(backup.investments));
     if(backup.cycle)       localStorage.setItem(CYCLE_SETTINGS_KEY, JSON.stringify(backup.cycle));
+    if(window.__pushToCloud) await window.__pushToCloud();
     alert("שוחזר בהצלחה ✓ הדף יטען מחדש.");
     location.reload();
   } catch(err){
