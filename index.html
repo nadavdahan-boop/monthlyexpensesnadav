@@ -865,6 +865,7 @@ function analyzeBank(rows){
     const catDef = CAT_BY_ID[cat] || {};
     if(catDef.nonExpense){
       investments.push(r);
+      byCat[cat] = (byCat[cat]||0) + r.amount;
       continue;
     }
     expenses.push(r);
