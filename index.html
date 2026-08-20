@@ -105,12 +105,13 @@
 <div id="authOverlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#f5f3ff,#eef2ff);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
   <div class="card" style="max-width:360px;width:100%;padding:28px" dir="rtl">
     <h2 style="text-align:center;margin-bottom:4px">📊 דשבורד הוצאות</h2>
-    <div class="sub" style="text-align:center;margin-bottom:20px">התחבר כדי לגשת לנתונים שלך מכל מכשיר</div>
+    <div class="sub" style="text-align:center;margin-bottom:20px">הזן את המייל שלך ונשלח לך קישור להתחברות - בלי סיסמה</div>
     <div id="authError" style="color:#ef4444;font-size:13px;margin-bottom:10px;display:none;text-align:center"></div>
-    <input id="authEmail" type="email" placeholder="אימייל" autocomplete="username" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px"/>
-    <input id="authPassword" type="password" placeholder="סיסמה" autocomplete="current-password" style="width:100%;padding:10px;margin-bottom:14px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px"/>
-    <button id="authLoginBtn" style="width:100%;padding:10px;margin-bottom:8px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">התחבר</button>
-    <button id="authSignupBtn" style="width:100%;padding:10px;background:#fff;color:#1f2937;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;font-size:14px">אין לי חשבון — הרשמה</button>
+    <div id="authFormStep">
+      <input id="authEmail" type="email" placeholder="אימייל" autocomplete="username" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px"/>
+      <button id="authSendLinkBtn" style="width:100%;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">שלח לי קישור להתחברות</button>
+    </div>
+    <div id="authSentStep" style="display:none;text-align:center;color:#065f46;font-size:14px;line-height:1.6">📩 שלחנו לך קישור למייל.<br/>לחץ עליו כדי להתחבר (בדוק גם בספאם).</div>
     <div id="authLoading" style="text-align:center;margin-top:14px;display:none;color:#6b7280;font-size:13px">⏳ טוען...</div>
   </div>
 </div>
@@ -398,46 +399,32 @@
   function clearAuthError(){ el("authError").style.display = "none"; }
   function setAuthLoading(v){
     el("authLoading").style.display = v ? "block" : "none";
-    el("authLoginBtn").disabled = v;
-    el("authSignupBtn").disabled = v;
+    el("authSendLinkBtn").disabled = v;
   }
 
-  window.addEventListener("DOMContentLoaded", async ()=>{
-    el("authLoginBtn").addEventListener("click", async ()=>{
-      clearAuthError();
-      const email = el("authEmail").value.trim(), password = el("authPassword").value;
-      if(!email || !password){ showAuthError("נא להזין אימייל וסיסמה"); return; }
-      setAuthLoading(true);
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      setAuthLoading(false);
-      if(error){ showAuthError(error.message); return; }
-      pullFromCloudAndBoot(data.user.id);
+  el("authSendLinkBtn").addEventListener("click", async ()=>{
+    clearAuthError();
+    const email = el("authEmail").value.trim();
+    if(!email){ showAuthError("נא להזין אימייל"); return; }
+    setAuthLoading(true);
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
+    setAuthLoading(false);
+    if(error){ showAuthError(error.message); return; }
+    el("authFormStep").style.display = "none";
+    el("authSentStep").style.display = "block";
+  });
 
-    el("authSignupBtn").addEventListener("click", async ()=>{
-      clearAuthError();
-      const email = el("authEmail").value.trim(), password = el("authPassword").value;
-      if(!email || !password){ showAuthError("נא להזין אימייל וסיסמה"); return; }
-      if(password.length < 6){ showAuthError("הסיסמה חייבת להיות באורך 6 תווים לפחות"); return; }
-      setAuthLoading(true);
-      const { data, error } = await sb.auth.signUp({ email, password });
-      setAuthLoading(false);
-      if(error){ showAuthError(error.message); return; }
-      if(data.session){
-        pullFromCloudAndBoot(data.user.id);
-      } else {
-        showAuthError("נרשמת! אם נדרש אישור מייל — אשר ואז התחבר.");
-      }
-    });
+  el("logoutBtn").addEventListener("click", async ()=>{
+    await sb.auth.signOut();
+    sessionStorage.removeItem(SESSION_RELOAD_FLAG);
+    window.__authedUserId = null;
+    location.reload();
+  });
 
-    el("logoutBtn").addEventListener("click", async ()=>{
-      await sb.auth.signOut();
-      sessionStorage.removeItem(SESSION_RELOAD_FLAG);
-      window.__authedUserId = null;
-      location.reload();
-    });
-
-    const { data: { session } } = await sb.auth.getSession();
+  sb.auth.onAuthStateChange((event, session)=>{
     if(session){
       pullFromCloudAndBoot(session.user.id);
     }
