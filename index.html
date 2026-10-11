@@ -146,6 +146,7 @@
       <button data-tab="cashflow" class="active">💰 תזרים</button>
       <button data-tab="invest">📈 השקעות</button>
       <button data-tab="breakdown">📊 פילוח</button>
+      <button data-tab="maaser">🤝 מעשר</button>
     </div>
 
     <div id="tab-cashflow" class="tabPanel active">
@@ -255,6 +256,38 @@
       </div>
     </div>
 
+    <div id="tab-maaser" class="tabPanel">
+      <p class="muted" style="margin-top:22px">מעקב מצטבר מ-11.9.2026: 10% מכל ההכנסות בבנק (ללא העברות בין החשבונות), מול מה ששולם — עסקאות בקטגוריה "🤝 מעשר וצדקה" באשראי ובבנק + תשלומים ידניים.</p>
+      <section class="grid kpis" id="maaserKpis"></section>
+
+      <section class="card" style="margin-top:22px">
+        <h2>➕ הוספת תשלום ידני (מזומן / ביט / העברה)</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <input id="maaserDate" type="date" style="padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit">
+          <input id="maaserPlace" type="text" list="maaserPlaceList" placeholder="מקום / עמותה" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit">
+          <datalist id="maaserPlaceList"></datalist>
+          <input id="maaserAmount" type="number" min="0" step="0.01" placeholder="סכום ₪" style="width:120px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit">
+          <button id="maaserAddBtn">הוסף</button>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top:22px">
+        <h2>📍 מצטבר לפי מקומות</h2>
+        <div class="scrollY"><table id="maaserPlaces"><thead><tr><th>מקום</th><th>סה"כ</th><th>%</th><th>תשלומים</th><th>אחרון</th><th>מקור</th></tr></thead><tbody></tbody></table></div>
+      </section>
+
+      <section class="grid two" style="margin-top:22px">
+        <div class="card">
+          <h2>🧾 כל תשלומי המעשר</h2>
+          <div class="scrollY"><table id="maaserPaid"><thead><tr><th>תאריך</th><th>מקום</th><th>סכום</th><th>מקור</th><th></th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <h2>💰 הכנסות שנכללו בחישוב</h2>
+          <div class="scrollY"><table id="maaserIncome"><thead><tr><th>תאריך</th><th>תיאור</th><th>סכום</th><th>10%</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+    </div>
+
     <div id="componentsModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;align-items:center;justify-content:center;padding:20px">
       <div class="card" style="max-width:560px;width:100%;max-height:80vh;overflow:auto">
         <div class="row-flex"><h2>⚙️ ניהול רכיבי תיק</h2><button class="ghost" onclick="document.getElementById('componentsModal').style.display='none'">סגור</button></div>
@@ -333,6 +366,7 @@
   const K_MAPPING = "hozaot_mapping_v1";
   const K_INVEST = "hozaot_investments_v1";
   const K_CYCLE = "hozaot_cycle_settings_v1";
+  const K_MAASER = "hozaot_maaser_v1";
   const SESSION_RELOAD_FLAG = "__cloud_synced_once";
 
   function el(id){ return document.getElementById(id); }
@@ -344,6 +378,7 @@
       mapping:     JSON.parse(localStorage.getItem(K_MAPPING)||"{}"),
       investments: JSON.parse(localStorage.getItem(K_INVEST)||"{}"),
       cycle:       JSON.parse(localStorage.getItem(K_CYCLE)||"{}"),
+      maaser:      JSON.parse(localStorage.getItem(K_MAASER)||"{}"),
     };
   }
   function applyBackupToLocalStorage(b){
@@ -352,6 +387,7 @@
     if(b.mapping)     localStorage.setItem(K_MAPPING, JSON.stringify(b.mapping));
     if(b.investments) localStorage.setItem(K_INVEST, JSON.stringify(b.investments));
     if(b.cycle)       localStorage.setItem(K_CYCLE, JSON.stringify(b.cycle));
+    if(b.maaser)      localStorage.setItem(K_MAASER, JSON.stringify(b.maaser));
   }
 
   let syncTimer = null;
@@ -1693,7 +1729,98 @@ document.querySelectorAll(".tabBar button").forEach(btn=>{
     document.getElementById("tab-"+tab).classList.add("active");
     if(tab==="invest"){ renderInvest(); document.getElementById("content").style.display="block"; }
     if(tab==="breakdown"){ renderBreakdown(); document.getElementById("content").style.display="block"; }
+    if(tab==="maaser"){ renderMaaser(); document.getElementById("content").style.display="block"; }
   });
+});
+
+/* ============================================================
+   מעשר — מעקב מצטבר מ-11.9.2026
+   ============================================================ */
+const MAASER_KEY = "hozaot_maaser_v1";
+const MAASER_START_NUM = 20260911;
+const MAASER_RATE = 0.10;
+function loadMaaser(){ try{ const o = JSON.parse(localStorage.getItem(MAASER_KEY)||"{}"); return {manual: Array.isArray(o.manual) ? o.manual : []}; } catch(e){ return {manual:[]}; } }
+function saveMaaser(){ try{ localStorage.setItem(MAASER_KEY, JSON.stringify(MAASER)); window.__scheduleCloudSync && window.__scheduleCloudSync(); } catch(e){ alert("שמירה נכשלה"); } }
+let MAASER = loadMaaser();
+function mDayNum(s){ const d = parseSimpleDate(s); return d ? d.year*10000 + d.month*100 + d.day : null; }
+function mFmtDate(s){ const d = parseSimpleDate(s); return d ? `${String(d.day).padStart(2,"0")}/${String(d.month).padStart(2,"0")}/${d.year}` : String(s||""); }
+function mEsc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function computeMaaser(){
+  const income = [], paid = [];
+  for(const mk of Object.keys(MONTHS)){
+    const M = MONTHS[mk] || {};
+    const rows = (M.bankTransactions || []).map(r => Object.assign({}, r));
+    if(rows.length){
+      const B = analyzeBank(rows);
+      B.income.forEach(r => { const n = mDayNum(r.date); if(n != null && n >= MAASER_START_NUM) income.push({date:r.date, n, desc:cleanDesc(r.description), amount:+r.amount}); });
+      B.expenses.forEach(r => { if(r._cat !== "maaser") return; const n = mDayNum(r.date); if(n != null && n >= MAASER_START_NUM) paid.push({date:r.date, n, place:cleanDesc(r.description), amount:+r.amount, src:"בנק"}); });
+    }
+    (M.creditTransactions || []).forEach(t => {
+      if(categorize(t.merchant, t.sourceCat, CUSTOM_MAP) !== "maaser") return;
+      const n = mDayNum(t.date);
+      if(n != null && n >= MAASER_START_NUM) paid.push({date:t.date, n, place:cleanDesc(t.merchant), amount:+t.amount, src:"אשראי"});
+    });
+  }
+  MAASER.manual.forEach(x => { paid.push({date:x.date, n:mDayNum(x.date)||0, place:x.place, amount:+x.amount, src:"ידני", id:x.id}); });
+  income.sort((a,b)=>b.n-a.n); paid.sort((a,b)=>b.n-a.n);
+  const incomeSum = income.reduce((s,x)=>s+x.amount, 0);
+  const due = incomeSum * MAASER_RATE;
+  const paidSum = paid.reduce((s,x)=>s+x.amount, 0);
+  const byPlace = {};
+  paid.forEach(p => { const k = p.place || "ללא שם"; const o = byPlace[k] = byPlace[k] || {place:k, sum:0, count:0, last:0, lastDate:"", srcs:new Set()}; o.sum += p.amount; o.count++; o.srcs.add(p.src); if(p.n > o.last){ o.last = p.n; o.lastDate = p.date; } });
+  const places = Object.values(byPlace).sort((a,b)=>b.sum-a.sum);
+  return {income, paid, incomeSum, due, paidSum, balance: due - paidSum, places};
+}
+
+function renderMaaser(){
+  const R = computeMaaser();
+  const owe = R.balance > 0.5;
+  const kpis = [
+    {label:"הכנסות מ-11.9", value:NIS(R.incomeSum), note:`${R.income.length} תקבולים`, cls:"green"},
+    {label:"מעשר לתשלום (10%)", value:NIS(R.due), note:"מצטבר", cls:"purple"},
+    {label:"שולם", value:NIS(R.paidSum), note:`${R.paid.length} תשלומים · ${R.places.length} מקומות`, cls:"cyan"},
+    {label: owe ? "יתרה לתשלום" : "עודף ששולם", value:NIS(Math.abs(R.balance)), note: R.due>0 ? `${Math.round(R.paidSum/R.due*100)}% מהחובה שולמו` : "", cls: owe ? "amber" : "green"},
+  ];
+  document.getElementById("maaserKpis").innerHTML = kpis.map(it=>`
+    <div class="card kpi ${it.cls}"><div class="accent"></div>
+      <div class="label">${it.label}</div>
+      <div class="value">${it.value}</div>
+      ${it.note?`<div class="delta">${it.note}</div>`:""}
+    </div>`).join("");
+
+  const maxSum = R.places.length ? R.places[0].sum : 0;
+  document.querySelector("#maaserPlaces tbody").innerHTML = R.places.length ? R.places.map(p=>`
+    <tr><td><b>${mEsc(p.place)}</b><div class="bar"><i style="width:${maxSum? (p.sum/maxSum*100).toFixed(1):0}%"></i></div></td>
+      <td>${NIS2(p.sum)}</td><td>${R.paidSum? (p.sum/R.paidSum*100).toFixed(1)+"%":""}</td><td>${p.count}</td><td>${mFmtDate(p.lastDate)}</td><td class="muted">${[...p.srcs].join(", ")}</td></tr>`).join("")
+    + `<tr style="font-weight:800"><td>סה"כ</td><td>${NIS2(R.paidSum)}</td><td></td><td>${R.paid.length}</td><td></td><td></td></tr>`
+    : `<tr><td colspan="6" class="muted">עוד אין תשלומי מעשר. סווג עסקאות לקטגוריה "🤝 מעשר וצדקה" או הוסף ידנית.</td></tr>`;
+
+  document.querySelector("#maaserPaid tbody").innerHTML = R.paid.map(p=>`
+    <tr><td>${mFmtDate(p.date)}</td><td>${mEsc(p.place)}</td><td>${NIS2(p.amount)}</td><td class="muted">${p.src}</td>
+      <td>${p.id ? `<button class="ghost" style="padding:4px 10px;font-size:12px" data-maaser-del="${mEsc(p.id)}">מחק</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">—</td></tr>`;
+
+  document.querySelector("#maaserIncome tbody").innerHTML = R.income.map(x=>`
+    <tr><td>${mFmtDate(x.date)}</td><td>${mEsc(x.desc)}</td><td>${NIS2(x.amount)}</td><td>${NIS2(x.amount*MAASER_RATE)}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">אין הכנסות מ-11.9 — העלה קובץ בנק</td></tr>`;
+
+  document.getElementById("maaserPlaceList").innerHTML = R.places.map(p=>`<option value="${mEsc(p.place)}"></option>`).join("");
+  document.querySelectorAll("[data-maaser-del]").forEach(b => b.onclick = () => {
+    if(!confirm("למחוק את התשלום הידני?")) return;
+    MAASER.manual = MAASER.manual.filter(x => x.id !== b.dataset.maaserDel);
+    saveMaaser(); renderMaaser();
+  });
+}
+
+document.getElementById("maaserAddBtn").addEventListener("click", () => {
+  const dv = document.getElementById("maaserDate").value;
+  const place = document.getElementById("maaserPlace").value.trim();
+  const amount = parseFloat(document.getElementById("maaserAmount").value);
+  if(!dv || !place || !(amount > 0)){ alert("נא למלא תאריך, מקום וסכום"); return; }
+  const [y, m, d] = dv.split("-");
+  MAASER.manual.push({id:"m_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:`${d}-${m}-${y}`, place, amount});
+  saveMaaser();
+  document.getElementById("maaserPlace").value = ""; document.getElementById("maaserAmount").value = "";
+  renderMaaser();
 });
 
 /* ============================================================
