@@ -1953,8 +1953,17 @@ function renderInvestKpis(){
   const last = totals[totals.length-1];
   const prev = totals[totals.length-2];
   const totalNow = last.total;
-  const totalPrev = prev ? prev.total : null;
-  const monthDelta = totalPrev!=null ? totalNow - totalPrev : null;
+  /* שינוי חודשי — רק רכיבים שיש להם שווי בשני החודשים (רכיב חדש לא נחשב כ"שינוי") */
+  let totalPrev = null, monthDelta = null;
+  if(prev){
+    let a = 0, b = 0, n = 0;
+    for(const c of INVESTMENTS.components){
+      const p = INVESTMENTS.data[prev.month]?.[c.id]?.balance, q = INVESTMENTS.data[last.month]?.[c.id]?.balance;
+      if(p==null || q==null) continue;
+      a += +p; b += +q; n++;
+    }
+    if(n){ totalPrev = a; monthDelta = b - a; }
+  }
   const compIds = INVESTMENTS.components.map(c=>c.id);
   function portfolioTWR(yearOnly){
     const yr = latestMonth.split("/")[1];
@@ -1964,8 +1973,10 @@ function renderInvestKpis(){
       const mPrev = months[i-1], mCur = months[i];
       let prevTotal = 0, curTotal = 0, deposits = 0;
       for(const id of compIds){
-        prevTotal += +INVESTMENTS.data[mPrev]?.[id]?.balance || 0;
-        curTotal  += +INVESTMENTS.data[mCur]?.[id]?.balance || 0;
+        const pb = INVESTMENTS.data[mPrev]?.[id]?.balance, cb = INVESTMENTS.data[mCur]?.[id]?.balance;
+        if(pb==null || cb==null) continue; /* רכיב שאין לו נתון בשני החודשים לא נכנס לחישוב התשואה */
+        prevTotal += +pb;
+        curTotal  += +cb;
         deposits  += +INVESTMENTS.data[mCur]?.[id]?.deposit || 0;
       }
       if(prevTotal===0) continue;
