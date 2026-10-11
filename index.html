@@ -879,12 +879,12 @@ function analyze(transactions){
   return {transactions, total, investSum, byCat, byMerchant, installments, standingOrders, investments, count:transactions.length};
 }
 
-function analyzeBank(rows){
+function findInternalTransfers(rows){ const toDay = s => { const d = parseSimpleDate(s); return d ? Date.UTC(d.year, d.month-1, d.day)/864e5 : null; }; const ins = rows.filter(r => r.isIncome && /מבנק יהב/.test(r.description||"")); const set = new Set(ins); const used = new Set(); for(const r of rows){ if(r.isIncome || !/נדב דהן|העברה ללאומי|העברה לבנק לאומי/.test(r.description||"")) continue; const d = toDay(r.date); if(d == null) continue; const m = ins.find(x => !used.has(x) && Math.abs(x.amount - r.amount) < 0.01 && Math.abs(toDay(x.date) - d) <= 3); if(m){ used.add(m); set.add(r); } } return set; } function analyzeBank(rows){ const INTERNAL = findInternalTransfers(rows); let internalSum = 0;
   const income = [], expenses = [], investments = [];
   let ccDebit = 0;
   const byCat = {};
   for(const r of rows){
-    if(!r.isIncome && isCreditCardCharge(r.description)){ ccDebit += r.amount; continue; }
+    if(INTERNAL.has(r)){ internalSum += r.amount; continue; } if(!r.isIncome && isCreditCardCharge(r.description)){ ccDebit += r.amount; continue; }
     if(r.isIncome){ income.push(r); continue; }
     /* מפתח ייחודי לשיקים: תיאור|תאריך|סכום */
     const bankKey = `${r.description}|${r.date}|${r.amount}`;
@@ -895,7 +895,7 @@ function analyzeBank(rows){
       /* שיק 3650 ב-1 או 2 לחודש = שכירות → חשבונות הבית */
       if(/שיק/i.test(desc) && Math.abs(amount-3650)<1 && d && d.day<=2) return "home";
       /* בנק יהב-אשראי = החזר מסגרת → השקעות/העברות פנימיות */
-      if(/יהב.{0,3}אשראי/i.test(desc)) return "invest";
+      if(/יהב.{0,3}אשראי/i.test(desc)) return "invest"; if(/אקסלנס|IBI|אי\.?בי\.?אי/i.test(desc)) return "invest"; if(/הוראת קבע/.test(desc) && Math.abs(amount-3500)<1) return "invest";
       return null;
     }
     const cat = autoCategorizeBankTx(r.description, r.amount, r.date) || categorize(r.description, "", CUSTOM_MAP);
