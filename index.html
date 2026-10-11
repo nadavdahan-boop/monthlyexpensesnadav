@@ -584,7 +584,7 @@ function accountingMonthByDay(dateStr, opts){
   // מיגרציה חד-פעמית: משייך מחדש עסקאות אשראי שכבר נשמרו לפי הכלל המעודכן
                            (function rebucketCreditOnce(){
     const FLAG = "hozaot_rebucket_weekend_v1";
-    try{ if(localStorage.getItem(FLAG)) return; }catch(e){ return; }
+    // runs on every load (idempotent) so cloud-synced data is fixed too
     let changed = false;
     for(const mk of Object.keys(MONTHS)){
       const txs = MONTHS[mk].creditTransactions;
@@ -607,8 +607,7 @@ function accountingMonthByDay(dateStr, opts){
         if(!Object.keys(MONTHS[mk]).length) delete MONTHS[mk];
   }
   }
-    if(changed) saveMonths(MONTHS);
-    try{ localStorage.setItem(FLAG, "1"); }catch(e){}
+    if(changed){ saveMonths(MONTHS); const iv=setInterval(()=>{ if(window.__authedUserId && window.__scheduleCloudSync){ clearInterval(iv); window.__scheduleCloudSync(); } }, 1000); setTimeout(()=>clearInterval(iv), 60000); }
   })();
 
 const MONTH_NAMES = {"01":"ינואר","02":"פברואר","03":"מרץ","04":"אפריל","05":"מאי","06":"יוני","07":"יולי","08":"אוגוסט","09":"ספטמבר","10":"אוקטובר","11":"נובמבר","12":"דצמבר"};
