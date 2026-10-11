@@ -2041,7 +2041,9 @@ function renderInvestComponentCards(){
     const monthDelta = (latest && prev) ? (latest.balance - prev.balance) : null;
     const monthDepositCur = latest ? (+INVESTMENTS.data[latest.month]?.[c.id]?.deposit || 0) : 0;
     const monthReturn = (latest && prev && prev.balance) ? (latest.balance - prev.balance - monthDepositCur)/prev.balance : null;
-    const ytd = ytdReturn(c.id, ret);
+    const ytdRep = latest ? INVESTMENTS.data[latest.month]?.[c.id]?.ytdReported : null;
+    const hasRep = ytdRep!=null && !isNaN(+ytdRep);
+    const ytd = hasRep ? (+ytdRep)/100 : ytdReturn(c.id, ret);
     const totalRet = totalReturn(c.id, ret);
     const totalDep = compTotalDeposits(c.id);
     return `<div class="card" style="border-top:3px solid ${color}">
@@ -2049,7 +2051,7 @@ function renderInvestComponentCards(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:13px">
         <div><div class="muted">שווי נוכחי</div><div style="font-size:20px;font-weight:800">${latest?NIS(latest.balance):"—"}</div></div>
         <div><div class="muted">שינוי מחודש קודם</div><div style="font-size:18px;font-weight:700;color:${monthDelta==null?'#6b7280':(monthDelta>=0?'#10b981':'#ef4444')}">${monthDelta==null?"—":((monthDelta>=0?"+":"")+NIS(monthDelta))}</div>${monthReturn!=null?`<div class="muted" style="font-size:12px">תשואה חודשית: ${(monthReturn*100).toFixed(2)}%</div>`:""}</div>
-        <div><div class="muted">תשואה YTD</div><div style="font-size:18px;font-weight:700;color:${ytd==null?'#6b7280':(ytd>=0?'#10b981':'#ef4444')}">${ytd==null?"—":((ytd>=0?"+":"")+(ytd*100).toFixed(2)+"%")}</div>${totalRet!=null?`<div class="muted" style="font-size:12px">מאז התחלה: ${(totalRet>=0?"+":"")+(totalRet*100).toFixed(2)}%</div>`:""}</div>
+        <div><div class="muted">תשואה YTD${hasRep?" (מדווחת)":""}</div><div style="font-size:18px;font-weight:700;color:${ytd==null?'#6b7280':(ytd>=0?'#10b981':'#ef4444')}">${ytd==null?"—":((ytd>=0?"+":"")+(ytd*100).toFixed(2)+"%")}</div>${totalRet!=null?`<div class="muted" style="font-size:12px">מאז התחלה: ${(totalRet>=0?"+":"")+(totalRet*100).toFixed(2)}%</div>`:""}</div>
         <div><div class="muted">סך הפקדות</div><div style="font-size:18px;font-weight:700">${NIS(totalDep)}</div></div>
       </div>
     </div>`;
@@ -2175,6 +2177,9 @@ function renderComponentInputs(monthKey){
         </label>
         <label style="font-size:13px">הפקדה החודש (₪)
           <input type="number" data-comp="${c.id}" data-field="deposit" value="${d.deposit!=null?d.deposit:""}" style="display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;font-family:inherit"/>
+        </label>
+        <label style="font-size:13px">תשואה מתחילת השנה (%) — לפי הקופה
+          <input type="number" step="0.01" data-comp="${c.id}" data-field="ytdReported" value="${d.ytdReported!=null?d.ytdReported:""}" placeholder="אופציונלי" style="display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:4px;font-family:inherit"/>
         </label>
       </div>
     </div>`;
