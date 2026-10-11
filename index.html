@@ -1511,7 +1511,8 @@ async function handleFiles(files){
         if(!Object.keys(buckets).length){ errors.push(`${file.name}: לא הצלחתי לזהות חודש חיוב`); continue; }
         for(const [mk, txs] of Object.entries(buckets)){
           if(!MONTHS[mk]) MONTHS[mk] = {};
-          const existing = MONTHS[mk].creditTransactions || [];
+          /* עסקאות שהוזנו ידנית (manual) מוחלפות בעסקה מהקובץ: אותו תאריך, סכום וכרטיס */
+          const existing = (MONTHS[mk].creditTransactions || []).filter(e => !(e.manual && txs.some(t => t.date===e.date && Math.abs((+t.amount)-(+e.amount))<0.01 && String(t.card||"")===String(e.card||""))));
           const seen = new Set(existing.map(t=>`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`));
           const merged = existing.slice();
           for(const t of txs){
