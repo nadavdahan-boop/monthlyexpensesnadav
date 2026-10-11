@@ -257,7 +257,7 @@
     </div>
 
     <div id="tab-maaser" class="tabPanel">
-      <p class="muted" style="margin-top:22px">מעקב מצטבר מ-11.9.2026: 10% מכל ההכנסות בבנק (ללא העברות בין החשבונות), מול מה ששולם — עסקאות בקטגוריה "🤝 מעשר וצדקה" באשראי ובבנק + תשלומים ידניים.</p>
+      <p class="muted" style="margin-top:22px">מעקב מצטבר: 10% מכל ההכנסות בבנק מ-11.9.2026 (ללא העברות בין החשבונות), מול מה ששולם — עסקאות בקטגוריה "🤝 מעשר וצדקה" באשראי ובבנק מ-12.9 + תשלומים ידניים.</p>
       <section class="grid kpis" id="maaserKpis"></section>
 
       <section class="card" style="margin-top:22px">
@@ -1737,7 +1737,8 @@ document.querySelectorAll(".tabBar button").forEach(btn=>{
    מעשר — מעקב מצטבר מ-11.9.2026
    ============================================================ */
 const MAASER_KEY = "hozaot_maaser_v1";
-const MAASER_START_NUM = 20260911;
+const MAASER_START_NUM = 20260911;      /* הכנסות נספרות מ-11.9 */
+const MAASER_PAID_START_NUM = 20260912; /* תשלומים נספרים מ-12.9 — תרומות 11.9 לא נחשבות */
 const MAASER_RATE = 0.10;
 function loadMaaser(){ try{ const o = JSON.parse(localStorage.getItem(MAASER_KEY)||"{}"); return {manual: Array.isArray(o.manual) ? o.manual : []}; } catch(e){ return {manual:[]}; } }
 function saveMaaser(){ try{ localStorage.setItem(MAASER_KEY, JSON.stringify(MAASER)); window.__scheduleCloudSync && window.__scheduleCloudSync(); } catch(e){ alert("שמירה נכשלה"); } }
@@ -1754,12 +1755,12 @@ function computeMaaser(){
     if(rows.length){
       const B = analyzeBank(rows);
       B.income.forEach(r => { const n = mDayNum(r.date); if(n != null && n >= MAASER_START_NUM) income.push({date:r.date, n, desc:cleanDesc(r.description), amount:+r.amount}); });
-      B.expenses.forEach(r => { if(r._cat !== "maaser") return; const n = mDayNum(r.date); if(n != null && n >= MAASER_START_NUM) paid.push({date:r.date, n, place:cleanDesc(r.description), amount:+r.amount, src:"בנק"}); });
+      B.expenses.forEach(r => { if(r._cat !== "maaser") return; const n = mDayNum(r.date); if(n != null && n >= MAASER_PAID_START_NUM) paid.push({date:r.date, n, place:cleanDesc(r.description), amount:+r.amount, src:"בנק"}); });
     }
     (M.creditTransactions || []).forEach(t => {
       if(categorize(t.merchant, t.sourceCat, CUSTOM_MAP) !== "maaser") return;
       const n = mDayNum(t.date);
-      if(n != null && n >= MAASER_START_NUM) paid.push({date:t.date, n, place:cleanDesc(t.merchant), amount:+t.amount, src:"אשראי"});
+      if(n != null && n >= MAASER_PAID_START_NUM) paid.push({date:t.date, n, place:cleanDesc(t.merchant), amount:+t.amount, src:"אשראי"});
     });
   }
   MAASER.manual.forEach(x => { paid.push({date:x.date, n:mDayNum(x.date)||0, place:x.place, amount:+x.amount, src:"ידני", id:x.id}); });
