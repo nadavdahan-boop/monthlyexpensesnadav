@@ -556,20 +556,60 @@ function shiftMonthBack(key){
   return `${String(month).padStart(2,"0")}/${year}`;
 }
 
-function accountingMonthByDay(dateStr){
-  const d = parseSimpleDate(dateStr);
-  if(!d) return null;
-  let month = d.month, year = d.year;
-  const cutoff = +CYCLE.cutoffDay || 10;
-  if(d.day <= cutoff){
-    month -= 1;
-    if(month<1){ month = 12; year -= 1; }
+function accountingMonthByDay(dateStr, opts){
+    const d = parseSimpleDate(dateStr);
+    if(!d) return null;
+    let month = d.month, year = d.year;
+    const cutoff = +CYCLE.cutoffDay || 10;
+    let day = d.day;
+    // חיוב אשראי שנדחה בגלל סוף שבוע: אם כל הימים מיום החיתוך ועד יום לפני החיוב הם שישי/שבת — מתייחסים אליו כאילו חויב ביום החיתוך
+    if(opts && opts.weekendShift && day > cutoff && day <= cutoff + 2){
+      let allWeekend = true;
+      for(let x = cutoff; x < day; x++){
+              const wd = new Date(year, month - 1, x).getDay();
+          if(wd !== 5 && wd !== 6){ allWeekend = false; break; }
   }
-  return `${String(month).padStart(2,"0")}/${year}`;
-}
+      if(allWeekend) day = cutoff;
+  }
+    if(day <= cutoff){
+      month -= 1;
+      if(month<1){ month = 12; year -= 1; }
+  }
+    return `${String(month).padStart(2,"0")}/${year}`;
+  }
 
-function creditAccountingMonth(billDateStr){ return accountingMonthByDay(billDateStr); }
-function bankAccountingMonth(dateStr){ return accountingMonthByDay(dateStr); }
+  function creditAccountingMonth(billDateStr){ return accountingMonthByDay(billDateStr, {weekendShift:true}); }
+  function bankAccountingMonth(dateStr){ return accountingMonthByDay(dateStr); }
+
+  // מיגרציה חד-פעמית: משייך מחדש עסקאות אשראי שכבר נשמרו לפי הכלל המעודכן
+                           (function rebucketCreditOnce(){
+    const FLAG = "hozaot_rebucket_weekend_v1";
+    try{ if(localStorage.getItem(FLAG)) return; }catch(e){ return; }
+    let changed = false;
+    for(const mk of Object.keys(MONTHS)){
+      const txs = MONTHS[mk].creditTransactions;
+      if(!Array.isArray(txs)) continue;
+      const keep = [];
+      for(const t of txs){
+        const target = t.billDate ? creditAccountingMonth(t.billDate) : null;
+        if(!target || target === mk){ keep.push(t); continue; }
+        if(!MONTHS[target]) MONTHS[target] = {};
+        const dest = MONTHS[target].creditTransactions || (MONTHS[target].creditTransactions = []);
+        const k = `${t.date}|${t.merchant}|${t.amount}|${t.billDate}`;
+        if(!dest.some(x => `${x.date}|${x.merchant}|${x.amount}|${x.billDate}` === k)) dest.push(t);
+        if(!MONTHS[target].creditFileName && MONTHS[mk].creditFileName) MONTHS[target].creditFileName = MONTHS[mk].creditFileName;
+        changed = true;
+  }
+      MONTHS[mk].creditTransactions = keep;
+      if(!keep.length){
+                delete MONTHS[mk].creditTransactions;
+        delete MONTHS[mk].creditFileName;
+        if(!Object.keys(MONTHS[mk]).length) delete MONTHS[mk];
+  }
+  }
+    if(changed) saveMonths(MONTHS);
+    try{ localStorage.setItem(FLAG, "1"); }catch(e){}
+  })();
 
 const MONTH_NAMES = {"01":"ינואר","02":"פברואר","03":"מרץ","04":"אפריל","05":"מאי","06":"יוני","07":"יולי","08":"אוגוסט","09":"ספטמבר","10":"אוקטובר","11":"נובמבר","12":"דצמבר"};
 function monthLabel(key){
