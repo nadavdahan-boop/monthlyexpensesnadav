@@ -347,7 +347,7 @@
     };
   }
   function applyBackupToLocalStorage(b){
-    if(b.months)      localStorage.setItem(K_MONTHS, JSON.stringify(b.months));
+    if(b.months){ let ch=false; try{ if(typeof rebucketMonthsObj==='function') ch=rebucketMonthsObj(b.months); }catch(e){ console.error(e); } localStorage.setItem(K_MONTHS, JSON.stringify(b.months)); if(ch && window.__scheduleCloudSync) setTimeout(()=>window.__scheduleCloudSync(), 0); }
     if(b.history)     localStorage.setItem(K_HISTORY, JSON.stringify(b.history));
     if(b.mapping)     localStorage.setItem(K_MAPPING, JSON.stringify(b.mapping));
     if(b.investments) localStorage.setItem(K_INVEST, JSON.stringify(b.investments));
@@ -609,7 +609,7 @@ function accountingMonthByDay(dateStr, opts){
   }
     if(changed){ saveMonths(MONTHS); const iv=setInterval(()=>{ if(window.__authedUserId && window.__scheduleCloudSync){ clearInterval(iv); window.__scheduleCloudSync(); } }, 1000); setTimeout(()=>clearInterval(iv), 60000); }
   })();
-
+function rebucketMonthsObj(M){ let changed=false; for(const mk of Object.keys(M)){ const txs=M[mk] && M[mk].creditTransactions; if(!Array.isArray(txs)) continue; const keep=[]; for(const t of txs){ const target=t.billDate ? creditAccountingMonth(t.billDate) : null; if(!target || target===mk){ keep.push(t); continue; } if(!M[target]) M[target]={}; const dest=M[target].creditTransactions || (M[target].creditTransactions=[]); const k=`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`; if(!dest.some(x=>`${x.date}|${x.merchant}|${x.amount}|${x.billDate}`===k)) dest.push(t); if(!M[target].creditFileName && M[mk].creditFileName) M[target].creditFileName=M[mk].creditFileName; changed=true; } M[mk].creditTransactions=keep; if(!keep.length){ delete M[mk].creditTransactions; delete M[mk].creditFileName; if(!Object.keys(M[mk]).length) delete M[mk]; } } return changed; }
 const MONTH_NAMES = {"01":"ינואר","02":"פברואר","03":"מרץ","04":"אפריל","05":"מאי","06":"יוני","07":"יולי","08":"אוגוסט","09":"ספטמבר","10":"אוקטובר","11":"נובמבר","12":"דצמבר"};
 function monthLabel(key){
   const m = /(\d{2})\/(\d{4})/.exec(key);
