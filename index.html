@@ -615,6 +615,13 @@ function accountingMonthByDay(dateStr, opts){
   }
 
   function creditAccountingMonth(billDateStr){ return accountingMonthByDay(billDateStr, {weekendShift:true}); }
+/* חודש של עסקת אשראי: לפי תאריך העסקה (מחזור 11 עד 10). עסקאות בתשלומים/קרדיט — לפי תאריך החיוב של התשלום */
+function creditMonthForTx(t){
+  if(!t) return null;
+  const installment = /תשלומים|קרדיט/.test(String(t.type||""));
+  if(!installment && t.date){ const m = accountingMonthByDay(t.date); if(m) return m; }
+  return t.billDate ? creditAccountingMonth(t.billDate) : null;
+}
   function bankAccountingMonth(dateStr){ return accountingMonthByDay(dateStr); }
 
   // מיגרציה חד-פעמית: משייך מחדש עסקאות אשראי שכבר נשמרו לפי הכלל המעודכן
@@ -627,7 +634,7 @@ function accountingMonthByDay(dateStr, opts){
       if(!Array.isArray(txs)) continue;
       const keep = [];
       for(const t of txs){
-        const target = t.billDate ? creditAccountingMonth(t.billDate) : null;
+        const target = creditMonthForTx(t);
         if(!target || target === mk){ keep.push(t); continue; }
         if(!MONTHS[target]) MONTHS[target] = {};
         const dest = MONTHS[target].creditTransactions || (MONTHS[target].creditTransactions = []);
@@ -645,7 +652,7 @@ function accountingMonthByDay(dateStr, opts){
   }
     if(changed){ saveMonths(MONTHS); const iv=setInterval(()=>{ if(window.__authedUserId && window.__scheduleCloudSync){ clearInterval(iv); window.__scheduleCloudSync(); } }, 1000); setTimeout(()=>clearInterval(iv), 60000); }
   })();
-function rebucketMonthsObj(M){ let changed=false; for(const mk of Object.keys(M)){ const txs=M[mk] && M[mk].creditTransactions; if(!Array.isArray(txs)) continue; const keep=[]; for(const t of txs){ const target=t.billDate ? creditAccountingMonth(t.billDate) : null; if(!target || target===mk){ keep.push(t); continue; } if(!M[target]) M[target]={}; const dest=M[target].creditTransactions || (M[target].creditTransactions=[]); const k=`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`; if(!dest.some(x=>`${x.date}|${x.merchant}|${x.amount}|${x.billDate}`===k)) dest.push(t); if(!M[target].creditFileName && M[mk].creditFileName) M[target].creditFileName=M[mk].creditFileName; changed=true; } M[mk].creditTransactions=keep; if(!keep.length){ delete M[mk].creditTransactions; delete M[mk].creditFileName; if(!Object.keys(M[mk]).length) delete M[mk]; } } return changed; }
+function rebucketMonthsObj(M){ let changed=false; for(const mk of Object.keys(M)){ const txs=M[mk] && M[mk].creditTransactions; if(!Array.isArray(txs)) continue; const keep=[]; for(const t of txs){ const target=creditMonthForTx(t); if(!target || target===mk){ keep.push(t); continue; } if(!M[target]) M[target]={}; const dest=M[target].creditTransactions || (M[target].creditTransactions=[]); const k=`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`; if(!dest.some(x=>`${x.date}|${x.merchant}|${x.amount}|${x.billDate}`===k)) dest.push(t); if(!M[target].creditFileName && M[mk].creditFileName) M[target].creditFileName=M[mk].creditFileName; changed=true; } M[mk].creditTransactions=keep; if(!keep.length){ delete M[mk].creditTransactions; delete M[mk].creditFileName; if(!Object.keys(M[mk]).length) delete M[mk]; } } return changed; }
 const MONTH_NAMES = {"01":"ינואר","02":"פברואר","03":"מרץ","04":"אפריל","05":"מאי","06":"יוני","07":"יולי","08":"אוגוסט","09":"ספטמבר","10":"אוקטובר","11":"נובמבר","12":"דצמבר"};
 function monthLabel(key){
   const m = /(\d{2})\/(\d{4})/.exec(key);
@@ -1504,7 +1511,7 @@ async function handleFiles(files){
         const fileAccountingMonth = fileMonthFromHeader ? shiftMonthBack(fileMonthFromHeader) : null;
         const buckets = {};
         for(const t of result.data.transactions){
-          const mk = creditAccountingMonth(t.billDate) || fileAccountingMonth || bankAccountingMonth(t.date);
+          const mk = creditMonthForTx(t) || fileAccountingMonth || bankAccountingMonth(t.date);
           if(!mk) continue;
           (buckets[mk] = buckets[mk] || []).push(t);
         }
