@@ -615,11 +615,9 @@ function accountingMonthByDay(dateStr, opts){
   }
 
   function creditAccountingMonth(billDateStr){ return accountingMonthByDay(billDateStr, {weekendShift:true}); }
-/* חודש של עסקת אשראי: לפי תאריך העסקה (מחזור 11 עד 10). עסקאות בתשלומים/קרדיט — לפי תאריך החיוב של התשלום */
+/* חודש של עסקת אשראי: לפי תאריך החיוב (חיוב עד ה-10, כולל דחייה בגלל סופ"ש = החודש הקודם) */
 function creditMonthForTx(t){
   if(!t) return null;
-  const installment = /תשלומים|קרדיט/.test(String(t.type||""));
-  if(!installment && t.date){ const m = accountingMonthByDay(t.date); if(m) return m; }
   return t.billDate ? creditAccountingMonth(t.billDate) : null;
 }
   function bankAccountingMonth(dateStr){ return accountingMonthByDay(dateStr); }
