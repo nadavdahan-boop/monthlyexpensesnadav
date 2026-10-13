@@ -1513,11 +1513,16 @@ async function handleFiles(files){
           if(!MONTHS[mk]) MONTHS[mk] = {};
           /* עסקאות שהוזנו ידנית (manual) מוחלפות בעסקה מהקובץ: אותו תאריך, סכום וכרטיס */
           const existing = (MONTHS[mk].creditTransactions || []).filter(e => !(e.manual && txs.some(t => t.date===e.date && Math.abs((+t.amount)-(+e.amount))<0.01 && String(t.card||"")===String(e.card||""))));
-          const seen = new Set(existing.map(t=>`${t.date}|${t.merchant}|${t.amount}|${t.billDate}`));
+          /* מניעת כפילויות לפי ספירה: עסקאות זהות באמת (אותו יום, בית עסק, סכום, כרטיס) נשמרות כמה פעמים שהן מופיעות בקובץ */
+          const ckey = t => `${t.date}|${t.merchant}|${t.amount}|${t.billDate}|${t.card||""}`;
+          const have = {};
+          existing.forEach(t => { const k = ckey(t); have[k] = (have[k]||0) + 1; });
+          const inFile = {};
           const merged = existing.slice();
           for(const t of txs){
-            const k = `${t.date}|${t.merchant}|${t.amount}|${t.billDate}`;
-            if(!seen.has(k)){ merged.push(t); seen.add(k); }
+            const k = ckey(t);
+            inFile[k] = (inFile[k]||0) + 1;
+            if(inFile[k] > (have[k]||0)){ merged.push(t); have[k] = (have[k]||0) + 1; }
           }
           MONTHS[mk].creditTransactions = merged;
           MONTHS[mk].creditFileName = file.name;
@@ -1534,10 +1539,12 @@ async function handleFiles(files){
           if(!MONTHS[mk]) MONTHS[mk] = {};
           const existing = MONTHS[mk].bankTransactions || [];
           const merged = existing.slice();
-          const seen = new Set(existing.map(r=>`${r.date}|${r.description}|${r.amount}|${r.isIncome}`));
+          const have = {}, inFile = {};
+          existing.forEach(r => { const k = `${r.date}|${r.description}|${r.amount}|${r.isIncome}`; have[k] = (have[k]||0) + 1; });
           for(const r of rows){
             const k = `${r.date}|${r.description}|${r.amount}|${r.isIncome}`;
-            if(!seen.has(k)){ merged.push(r); seen.add(k); }
+            inFile[k] = (inFile[k]||0) + 1;
+            if(inFile[k] > (have[k]||0)){ merged.push(r); have[k] = (have[k]||0) + 1; }
           }
           MONTHS[mk].bankTransactions = merged;
           MONTHS[mk].bankFileName = file.name;
